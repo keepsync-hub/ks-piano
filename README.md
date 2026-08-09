@@ -5,7 +5,7 @@ A falling-notes piano trainer that runs entirely in the browser.
 ## Features
 
 - 88-key on-screen piano, playable by mouse/touch, a real MIDI keyboard (Web MIDI API), or your computer keyboard (`A`–`;` maps to one octave+ starting at C4)
-- Falling-notes visualizer synced to playback, color-coded by hand
+- Two ways to follow a song, switchable at any time: a falling-notes visualizer, or a real sheet-music (grand staff) view that auto-scrolls with a playhead, for reading practice
 - **Listen mode**: the song plays itself through a built-in synth
 - **Practice mode**: playback pauses at each note/chord until you play the right key(s), then continues
 - Upload your own `.mid`/`.midi` files, or pick from a few built-in public-domain demo songs
@@ -29,4 +29,4 @@ Then open the printed local URL. For real MIDI keyboard input, use a Chromium-ba
 
 ## Stack
 
-React + TypeScript + Vite, [Tone.js](https://tonejs.github.io/) for synthesis, [@tonejs/midi](https://github.com/Tonejs/Midi) for parsing uploaded MIDI files.
+React + TypeScript + Vite, [Tone.js](https://tonejs.github.io/) for synthesis, [@tonejs/midi](https://github.com/Tonejs/Midi) for parsing uploaded MIDI files, [VexFlow](https://www.vexflow.com/) for sheet-music notation (lazy-loaded only when that view is opened).

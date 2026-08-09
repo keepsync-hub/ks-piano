@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { usePlaybackEngine } from './hooks/usePlaybackEngine'
 import { useComputerKeyboard } from './hooks/useComputerKeyboard'
 import { DEMO_SONGS } from './midi/demoSongs'
@@ -9,9 +9,15 @@ import { TransportControls } from './components/TransportControls'
 import { Legend } from './components/Legend'
 import './App.css'
 
+// VexFlow pulls in a large glyph/font payload, so keep it out of the main bundle.
+const SheetMusic = lazy(() => import('./components/SheetMusic').then((m) => ({ default: m.SheetMusic })))
+
+type StageView = 'falling' | 'sheet'
+
 function App() {
   const engine = usePlaybackEngine()
   useComputerKeyboard(engine.noteOn, engine.noteOff)
+  const [view, setView] = useState<StageView>('falling')
 
   useEffect(() => {
     engine.loadSong(DEMO_SONGS[1])
@@ -22,7 +28,10 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>ks-piano</h1>
-        <p className="tagline">Falling-notes piano trainer — play along on a MIDI keyboard, your computer keys, or click the keys below.</p>
+        <p className="tagline">
+          Piano trainer — switch between falling notes and sheet music, and play along on a MIDI keyboard, your
+          computer keys, or the on-screen keys.
+        </p>
         <Legend />
       </header>
 
@@ -35,8 +44,35 @@ function App() {
           <div className="song-heading">
             <h2>{engine.song?.title ?? 'No song loaded'}</h2>
             {engine.song?.composer && <span className="song-heading-composer">{engine.song.composer}</span>}
+            <div className="view-toggle" role="group" aria-label="Stage view">
+              <button
+                type="button"
+                className={view === 'falling' ? 'view-btn view-btn-active' : 'view-btn'}
+                onClick={() => setView('falling')}
+              >
+                Falling notes
+              </button>
+              <button
+                type="button"
+                className={view === 'sheet' ? 'view-btn view-btn-active' : 'view-btn'}
+                onClick={() => setView('sheet')}
+              >
+                Sheet music
+              </button>
+            </div>
           </div>
-          <FallingNotes song={engine.song} time={engine.time} isWaitingForInput={engine.isWaitingForInput} />
+          {view === 'falling' ? (
+            <FallingNotes song={engine.song} time={engine.time} isWaitingForInput={engine.isWaitingForInput} />
+          ) : (
+            <Suspense fallback={<div className="sheet-music-loading">Loading sheet music renderer…</div>}>
+              <SheetMusic
+                song={engine.song}
+                time={engine.time}
+                heldNotes={engine.heldNotes}
+                requiredNotes={engine.nextRequiredNotes}
+              />
+            </Suspense>
+          )}
           <PianoKeyboard
             heldNotes={engine.heldNotes}
             soundingNotes={engine.soundingNotes}

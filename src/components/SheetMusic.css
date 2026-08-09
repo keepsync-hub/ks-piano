@@ -1,0 +1,51 @@
+.sheet-music-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: #12141a;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-music-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.sheet-music-inner {
+  position: relative;
+  display: inline-block;
+  min-width: 100%;
+}
+
+.sheet-music-host svg {
+  display: block;
+}
+
+.sheet-music-host :is(text, path, line, rect):not(.sheet-highlights *) {
+  fill: #e6e8ee;
+  stroke: #e6e8ee;
+}
+
+.sheet-music-playhead {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 2px;
+  background: #ffb84d;
+  box-shadow: 0 0 6px rgba(255, 184, 77, 0.7);
+  pointer-events: none;
+}
+
+.sheet-music-empty {
+  margin: 0;
+  padding: 24px;
+  color: #8a90a2;
+  font-size: 13px;
+  text-align: center;
+}

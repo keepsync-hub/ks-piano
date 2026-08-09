@@ -17,6 +17,8 @@ export interface Song {
   composer?: string
   notes: NoteEvent[]
   duration: number
+  /** Beats per minute, used to lay out sheet music notation. */
+  bpm: number
 }
 
 export type PlaybackMode = 'listen' | 'practice'

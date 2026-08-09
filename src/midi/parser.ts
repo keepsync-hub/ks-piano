@@ -33,10 +33,13 @@ export async function parseMidiFile(file: File): Promise<Song> {
 
   notes.sort((a, b) => a.time - b.time)
 
+  const bpm = midi.header.tempos[0]?.bpm ?? 120
+
   return {
     id: `upload-${Date.now()}`,
     title: file.name.replace(/\.(mid|midi)$/i, ''),
     notes,
     duration: midi.duration,
+    bpm,
   }
 }
