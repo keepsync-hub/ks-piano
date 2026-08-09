@@ -1,0 +1,33 @@
+.legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #9aa0b0;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.legend-swatch-right {
+  background: linear-gradient(#a6e2ff, #3fb6ff);
+}
+
+.legend-swatch-left {
+  background: linear-gradient(#ffc0dd, #ff5fa8);
+}
+
+.legend-swatch-held {
+  background: linear-gradient(#8fe0b0, #4fc27f);
+}

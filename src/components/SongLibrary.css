@@ -1,0 +1,92 @@
+.song-library {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.song-library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px 10px;
+}
+
+.song-library-header h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a90a2;
+  margin: 0;
+}
+
+.upload-btn {
+  background: #1f2430;
+  border: 1px solid #333a4a;
+  color: #dfe3ee;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.upload-btn:hover {
+  background: #2a3140;
+}
+
+.song-library-error {
+  margin: 0 16px 8px;
+  color: #ff8a8a;
+  font-size: 12px;
+}
+
+.song-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.song-list-group {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #565c6c;
+  padding: 10px 8px 4px;
+}
+
+.song-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #cfd3de;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.song-row:hover {
+  background: #1a1e28;
+}
+
+.song-row-active {
+  background: #23324a;
+  color: #fff;
+}
+
+.song-title {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.song-composer {
+  font-size: 11px;
+  color: #8a90a2;
+}
