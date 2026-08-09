@@ -12,7 +12,9 @@ vi.mock('@tonejs/midi', () => {
     }
     duration = 10
     tracks: { notes: NoteEvent[] }[] = []
-    constructor(public buffer: ArrayBuffer) {
+    buffer: ArrayBuffer
+    constructor(buffer: ArrayBuffer) {
+      this.buffer = buffer
       this.tracks = [
         {
           notes: [
@@ -33,28 +35,29 @@ vi.mock('@tonejs/midi', () => {
 
 import { parseMidiFile } from './parser'
 
+function makeMidiFile(name: string, shouldFail = false): File {
+  return {
+    name,
+    arrayBuffer: async () => {
+      if (shouldFail) throw new Error('bad midi')
+      return new Uint8Array(10).buffer
+    },
+  } as unknown as File
+}
+
 describe('parseMidiFile', () => {
   it('rejects non-MIDI files', async () => {
-    const file = new File(['x'], 'song.txt', { type: 'text/plain' })
+    const file = makeMidiFile('song.txt')
     await expect(parseMidiFile(file)).rejects.toThrow('Only .mid and .midi files are supported')
   })
 
   it('rejects corrupted MIDI files', async () => {
-    vi.doMock('@tonejs/midi', () => ({
-      Midi: class {
-        constructor() {
-          throw new Error('bad midi')
-        }
-      },
-    }))
-    const file = new File([new Uint8Array(10)], 'bad.mid', { type: 'audio/midi' })
+    const file = makeMidiFile('bad.mid', true)
     await expect(parseMidiFile(file)).rejects.toThrow('Could not parse MIDI file')
-    vi.unmock('@tonejs/midi')
   })
 
-
   it('parses a two-track file into right and left hands', async () => {
-    const file = new File([new Uint8Array(10)], 'test.mid', { type: 'audio/midi' })
+    const file = makeMidiFile('test.mid')
     const song = await parseMidiFile(file)
     expect(song.title).toBe('test')
     expect(song.notes.length).toBe(3)
@@ -63,13 +66,13 @@ describe('parseMidiFile', () => {
   })
 
   it('clips note durations to a minimum', async () => {
-    const file = new File([new Uint8Array(10)], 'test.mid', { type: 'audio/midi' })
+    const file = makeMidiFile('test.mid')
     const song = await parseMidiFile(file)
     expect(song.notes.every((n) => n.duration >= 0.05)).toBe(true)
   })
 
   it('extracts tempo, key and time signature', async () => {
-    const file = new File([new Uint8Array(10)], 'test.mid', { type: 'audio/midi' })
+    const file = makeMidiFile('test.mid')
     const song = await parseMidiFile(file)
     expect(song.bpm).toBe(120)
     expect(song.keySignature).toBe('C Major')

@@ -14,9 +14,10 @@ export async function parseMidiFile(file: File): Promise<Song> {
     throw new Error('Only .mid and .midi files are supported')
   }
 
-  const buffer = await file.arrayBuffer()
+  let buffer: ArrayBuffer
   let midi: Midi
   try {
+    buffer = await file.arrayBuffer()
     midi = new Midi(buffer)
   } catch {
     throw new Error('Could not parse MIDI file: the file may be corrupted or invalid')

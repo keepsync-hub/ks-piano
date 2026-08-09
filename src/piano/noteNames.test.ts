@@ -29,6 +29,6 @@ describe('midiToOctave', () => {
     expect(midiToOctave(60)).toBe(4) // C4
     expect(midiToOctave(69)).toBe(4) // A4
     expect(midiToOctave(72)).toBe(5) // C5
-    expect(midiToOctave(108)).toBe(7) // C8
+    expect(midiToOctave(108)).toBe(8) // C8
   })
 })
