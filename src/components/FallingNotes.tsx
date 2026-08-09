@@ -14,9 +14,12 @@ interface FallingNotesProps {
   /** Score time of the required group, so only that occurrence is highlighted. */
   requiredTime?: number | null
   stats?: { notesPlayed: number; totalNotes: number; errors: number }
+  /** How many seconds of upcoming music fill the stage; lower zooms in. */
+  lookaheadSeconds?: number
+  showMeasureLines?: boolean
 }
 
-const LOOKAHEAD_SECONDS = 3.5
+const DEFAULT_LOOKAHEAD = 3.5
 const LABEL_MIN_HEIGHT = 26
 const LABEL_MIN_WIDTH = 15
 const BEATS_PER_MEASURE = 4
@@ -29,6 +32,8 @@ export function FallingNotes({
   requiredNotes,
   requiredTime,
   stats,
+  lookaheadSeconds = DEFAULT_LOOKAHEAD,
+  showMeasureLines = true,
 }: FallingNotesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const layout = useRef(buildKeyboardLayout()).current
@@ -81,11 +86,31 @@ export function FallingNotes({
       ctx.stroke()
     }
 
+    // Horizontal beat/measure grid, so rhythm is readable against the falling notes.
+    if (song && showMeasureLines) {
+      const secondsPerBeat = 60 / song.bpm
+      const firstBeat = Math.floor(time / secondsPerBeat)
+      const lastBeat = Math.ceil((time + lookaheadSeconds) / secondsPerBeat)
+      for (let beat = firstBeat; beat <= lastBeat; beat++) {
+        if (beat < 0) continue
+        const beatTime = beat * secondsPerBeat
+        const y = h * (1 - (beatTime - time) / lookaheadSeconds)
+        if (y < 0 || y > h) continue
+        const isDownbeat = beat % BEATS_PER_MEASURE === 0
+        ctx.strokeStyle = isDownbeat ? 'rgba(255, 255, 255, 0.26)' : 'rgba(255, 255, 255, 0.09)'
+        ctx.lineWidth = (isDownbeat ? 1.6 : 1) * dpr
+        ctx.beginPath()
+        ctx.moveTo(0, Math.round(y) + 0.5)
+        ctx.lineTo(w, Math.round(y) + 0.5)
+        ctx.stroke()
+      }
+    }
+
     if (song) {
       const labelFont = `600 ${Math.round(12 * dpr)}px -apple-system, "Segoe UI", Roboto, sans-serif`
       for (const note of song.notes) {
         const noteEnd = note.time + note.duration
-        if (noteEnd < time - 0.1 || note.time > time + LOOKAHEAD_SECONDS) continue
+        if (noteEnd < time - 0.1 || note.time > time + lookaheadSeconds) continue
 
         const key = keyByMidi.get(note.midi)
         if (!key) continue
@@ -94,8 +119,8 @@ export function FallingNotes({
         const x = (key.x / whiteCount) * w + gap
         const width = (key.width / whiteCount) * w - gap * 2
 
-        const yBottom = h * (1 - (note.time - time) / LOOKAHEAD_SECONDS)
-        const yTop = h * (1 - (noteEnd - time) / LOOKAHEAD_SECONDS)
+        const yBottom = h * (1 - (note.time - time) / lookaheadSeconds)
+        const yTop = h * (1 - (noteEnd - time) / lookaheadSeconds)
         const barTop = Math.max(0, Math.min(yTop, yBottom))
         const barHeight = Math.max(5 * dpr, Math.abs(yBottom - yTop))
 
@@ -154,7 +179,18 @@ export function FallingNotes({
     ctx.moveTo(0, hitY)
     ctx.lineTo(w, hitY)
     ctx.stroke()
-  }, [song, time, isWaitingForInput, heldNotes, requiredNotes, requiredTime, layout, keyByMidi])
+  }, [
+    song,
+    time,
+    isWaitingForInput,
+    heldNotes,
+    requiredNotes,
+    requiredTime,
+    lookaheadSeconds,
+    showMeasureLines,
+    layout,
+    keyByMidi,
+  ])
 
   const measureNumber = useMemo(() => {
     if (!song) return null

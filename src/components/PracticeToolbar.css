@@ -1,0 +1,82 @@
+.practice-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  padding: 8px 16px;
+  background: #12141a;
+  border-top: 1px solid #23262f;
+  font-size: 12px;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tool-label {
+  color: #767d8f;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10.5px;
+  margin-right: 2px;
+}
+
+.tool-btn {
+  background: #1c2029;
+  border: 1px solid #2c3140;
+  color: #cfd3de;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tool-btn:hover {
+  background: #262c38;
+}
+
+.tool-btn-active {
+  background: #2c3446;
+  border-color: #3f4c66;
+  color: #fff;
+}
+
+.tool-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #9aa0b0;
+  cursor: pointer;
+}
+
+.tool-check input {
+  accent-color: #4a90d9;
+  margin: 0;
+}
+
+.tool-readout {
+  color: #9aa0b0;
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: center;
+}
+
+.tool-group input[type='range'] {
+  width: 92px;
+  accent-color: #4a90d9;
+}
+
+.tool-countin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffb84d;
+  color: #14161b;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

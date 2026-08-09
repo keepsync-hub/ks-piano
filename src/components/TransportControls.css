@@ -39,9 +39,35 @@
   height: 42px;
 }
 
-.seek {
+.seek-wrap {
+  position: relative;
   flex: 1;
-  accent-color: #3fb6ff;
+  display: flex;
+  align-items: center;
+}
+
+.seek {
+  width: 100%;
+  accent-color: #4a90d9;
+  position: relative;
+  z-index: 1;
+}
+
+/* Shaded band showing the A–B loop region behind the scrubber. */
+.seek-loop {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(255, 184, 77, 0.45);
+  border: 1px solid rgba(255, 184, 77, 0.8);
+  pointer-events: none;
+}
+
+.seek-loop-off {
+  background: rgba(154, 160, 176, 0.28);
+  border-color: rgba(154, 160, 176, 0.5);
 }
 
 .time-label {

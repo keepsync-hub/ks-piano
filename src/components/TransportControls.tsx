@@ -1,3 +1,4 @@
+import type { LoopRegion } from '../hooks/usePlaybackEngine'
 import type { PlaybackMode, Song } from '../types'
 import './TransportControls.css'
 
@@ -10,6 +11,8 @@ interface TransportControlsProps {
   mode: PlaybackMode
   midiDevices: string[]
   isWaitingForInput: boolean
+  loop?: LoopRegion | null
+  loopEnabled?: boolean
   onTogglePlay: () => void
   onRestart: () => void
   onSeek: (t: number) => void
@@ -32,6 +35,8 @@ export function TransportControls({
   mode,
   midiDevices,
   isWaitingForInput,
+  loop,
+  loopEnabled,
   onTogglePlay,
   onRestart,
   onSeek,
@@ -54,16 +59,27 @@ export function TransportControls({
           {playing ? '⏸' : '▶'}
         </button>
 
-        <input
-          className="seek"
-          type="range"
-          min={0}
-          max={1}
-          step={0.001}
-          value={Number.isFinite(progress) ? progress : 0}
-          disabled={!song}
-          onChange={(e) => song && onSeek(Number(e.target.value) * song.duration)}
-        />
+        <div className="seek-wrap">
+          {song && loop && song.duration > 0 && (
+            <span
+              className={loopEnabled ? 'seek-loop' : 'seek-loop seek-loop-off'}
+              style={{
+                left: `${(loop.start / song.duration) * 100}%`,
+                width: `${((loop.end - loop.start) / song.duration) * 100}%`,
+              }}
+            />
+          )}
+          <input
+            className="seek"
+            type="range"
+            min={0}
+            max={1}
+            step={0.001}
+            value={Number.isFinite(progress) ? progress : 0}
+            disabled={!song}
+            onChange={(e) => song && onSeek(Number(e.target.value) * song.duration)}
+          />
+        </div>
         <span className="time-label">
           {formatTime(time)} / {formatTime(song?.duration ?? 0)}
         </span>

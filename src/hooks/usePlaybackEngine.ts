@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Hand, NoteEvent, PlaybackMode, Song } from '../types'
 import { ensureAudioStarted, playNote, releaseNote } from '../audio/synth'
+import { playClick } from '../audio/metronome'
 import { connectMidiInputs } from '../audio/midiInput'
 
 interface NoteGroup {
@@ -8,7 +9,17 @@ interface NoteGroup {
   notes: NoteEvent[]
 }
 
+export type HandFilter = 'both' | Hand
+export interface LoopRegion {
+  start: number
+  end: number
+}
+
 const GROUP_EPSILON = 0.05
+const BEATS_PER_MEASURE = 4
+const COUNT_IN_BEATS = 4
+/** Shorter A–B regions are treated as unset rather than looping every frame. */
+const MIN_LOOP_SECONDS = 0.25
 
 function buildGroups(notes: NoteEvent[]): NoteGroup[] {
   const sorted = [...notes].sort((a, b) => a.time - b.time)
@@ -24,8 +35,6 @@ function buildGroups(notes: NoteEvent[]): NoteGroup[] {
   return groups
 }
 
-export type InputSource = 'midi' | 'keyboard' | 'mouse'
-
 export function usePlaybackEngine() {
   const [song, setSongState] = useState<Song | null>(null)
   const [mode, setModeState] = useState<PlaybackMode>('listen')
@@ -38,7 +47,16 @@ export function usePlaybackEngine() {
   const [clearedGroupIndex, setClearedGroupIndex] = useState(-1)
   const [midiDevices, setMidiDevices] = useState<string[]>([])
   const [notesPlayed, setNotesPlayed] = useState(0)
+  const [totalNotes, setTotalNotes] = useState(0)
   const [errors, setErrors] = useState(0)
+
+  const [handFilter, setHandFilterState] = useState<HandFilter>('both')
+  const [loop, setLoop] = useState<LoopRegion | null>(null)
+  const [loopEnabled, setLoopEnabledState] = useState(true)
+  const [metronomeEnabled, setMetronomeEnabledState] = useState(false)
+  const [countInEnabled, setCountInEnabled] = useState(true)
+  const [countInBeat, setCountInBeat] = useState(0)
+  const [inputOctaveShift, setInputOctaveShift] = useState(0)
 
   const songRef = useRef<Song | null>(null)
   const modeRef = useRef<PlaybackMode>('listen')
@@ -46,19 +64,38 @@ export function usePlaybackEngine() {
   const playingRef = useRef(false)
   const heldNotesRef = useRef<Set<number>>(new Set())
   const groupsRef = useRef<NoteGroup[]>([])
+  const activeNotesRef = useRef<NoteEvent[]>([])
   const clearedGroupIndexRef = useRef(-1)
   const notesCursorRef = useRef(0)
   const notesPassedRef = useRef(0)
   const errorsRef = useRef(0)
   const requiredNotesRef = useRef<Set<number>>(new Set())
+  const handFilterRef = useRef<HandFilter>('both')
+  const loopRef = useRef<LoopRegion | null>(null)
+  const loopEnabledRef = useRef(true)
+  const metronomeRef = useRef(false)
+  const lastBeatRef = useRef(Number.NEGATIVE_INFINITY)
+  const inputShiftRef = useRef(0)
+  const countInTimersRef = useRef<number[]>([])
   const soundingMapRef = useRef<Map<number, { endTime: number; hand: Hand }>>(new Map())
   const clockRef = useRef<{ baseTime: number; startedAt: number | null }>({ baseTime: 0, startedAt: null })
+
+  const isActiveHand = useCallback(
+    (hand: Hand) => handFilterRef.current === 'both' || handFilterRef.current === hand,
+    [],
+  )
 
   const computeTime = useCallback((): number => {
     const c = clockRef.current
     if (!playingRef.current || c.startedAt === null) return c.baseTime
     const elapsed = ((performance.now() - c.startedAt) / 1000) * speedRef.current
     return c.baseTime + elapsed
+  }, [])
+
+  const cancelCountIn = useCallback(() => {
+    for (const id of countInTimersRef.current) window.clearTimeout(id)
+    countInTimersRef.current = []
+    setCountInBeat(0)
   }, [])
 
   const pauseAt = useCallback((t: number) => {
@@ -78,8 +115,12 @@ export function usePlaybackEngine() {
     let cursor = 0
     while (cursor < notes.length && notes[cursor].time <= t) cursor++
     notesCursorRef.current = cursor
-    notesPassedRef.current = cursor
-    setNotesPlayed(cursor)
+
+    const active = activeNotesRef.current
+    let passed = 0
+    while (passed < active.length && active[passed].time <= t) passed++
+    notesPassedRef.current = passed
+    setNotesPlayed(passed)
 
     const groups = groupsRef.current
     let idx = -1
@@ -90,20 +131,33 @@ export function usePlaybackEngine() {
     clearedGroupIndexRef.current = idx
     setClearedGroupIndex(idx)
 
+    lastBeatRef.current = Number.NEGATIVE_INFINITY
     soundingMapRef.current.clear()
     setSoundingNotes(new Set())
     setSoundingHands(new Map())
   }, [])
 
+  /** Rebuilds the practice target set whenever the song or the hand filter changes. */
+  const rebuildActiveSet = useCallback(
+    (targetSong: Song | null, filter: HandFilter, atTime: number) => {
+      const notes = targetSong?.notes ?? []
+      const active = notes.filter((n) => filter === 'both' || n.hand === filter)
+      activeNotesRef.current = active
+      groupsRef.current = buildGroups(active)
+      setTotalNotes(active.length)
+      recalcCursorsFor(atTime)
+    },
+    [recalcCursorsFor],
+  )
+
   const loadSong = useCallback(
     (newSong: Song) => {
       songRef.current = newSong
-      groupsRef.current = buildGroups(newSong.notes)
       clockRef.current = { baseTime: 0, startedAt: null }
       playingRef.current = false
       heldNotesRef.current = new Set()
-      notesCursorRef.current = 0
       errorsRef.current = 0
+      loopRef.current = null
       soundingMapRef.current.clear()
       setSongState(newSong)
       setTime(0)
@@ -111,9 +165,10 @@ export function usePlaybackEngine() {
       setHeldNotes(new Set())
       setSoundingNotes(new Set())
       setErrors(0)
-      recalcCursorsFor(0)
+      setLoop(null)
+      rebuildActiveSet(newSong, handFilterRef.current, 0)
     },
-    [recalcCursorsFor],
+    [rebuildActiveSet],
   )
 
   const seek = useCallback(
@@ -127,25 +182,57 @@ export function usePlaybackEngine() {
     [recalcCursorsFor],
   )
 
+  /** Relative seek that reads the live clock, so shortcut handlers stay stable. */
+  const seekBy = useCallback(
+    (delta: number) => {
+      seek(computeTime() + delta)
+    },
+    [computeTime, seek],
+  )
+
   const play = useCallback(async () => {
-    if (!songRef.current) return
+    const current = songRef.current
+    if (!current) return
     await ensureAudioStarted()
+
+    // Optional count-in: click through a full bar before the clock starts.
+    if (metronomeRef.current && countInEnabled) {
+      cancelCountIn()
+      const beatMs = ((60 / current.bpm) * 1000) / speedRef.current
+      for (let i = 0; i < COUNT_IN_BEATS; i++) {
+        const id = window.setTimeout(() => {
+          playClick(i === 0)
+          setCountInBeat(COUNT_IN_BEATS - i)
+        }, i * beatMs)
+        countInTimersRef.current.push(id)
+      }
+      const startId = window.setTimeout(() => {
+        countInTimersRef.current = []
+        setCountInBeat(0)
+        resumeFrom(clockRef.current.baseTime)
+      }, COUNT_IN_BEATS * beatMs)
+      countInTimersRef.current.push(startId)
+      return
+    }
+
     resumeFrom(clockRef.current.baseTime)
-  }, [resumeFrom])
+  }, [cancelCountIn, countInEnabled, resumeFrom])
 
   const pause = useCallback(() => {
+    cancelCountIn()
     pauseAt(computeTime())
-  }, [computeTime, pauseAt])
+  }, [cancelCountIn, computeTime, pauseAt])
 
   const togglePlay = useCallback(() => {
-    if (playingRef.current) pause()
+    if (playingRef.current || countInTimersRef.current.length > 0) pause()
     else void play()
   }, [pause, play])
 
   const restart = useCallback(() => {
+    cancelCountIn()
     seek(0)
     pauseAt(0)
-  }, [pauseAt, seek])
+  }, [cancelCountIn, pauseAt, seek])
 
   const setSpeed = useCallback(
     (s: number) => {
@@ -165,6 +252,54 @@ export function usePlaybackEngine() {
     },
     [computeTime, recalcCursorsFor],
   )
+
+  const setHandFilter = useCallback(
+    (filter: HandFilter) => {
+      handFilterRef.current = filter
+      setHandFilterState(filter)
+      rebuildActiveSet(songRef.current, filter, computeTime())
+    },
+    [computeTime, rebuildActiveSet],
+  )
+
+  const setMetronomeEnabled = useCallback(
+    (enabled: boolean) => {
+      metronomeRef.current = enabled
+      setMetronomeEnabledState(enabled)
+      if (!enabled) cancelCountIn()
+    },
+    [cancelCountIn],
+  )
+
+  const setLoopEnabled = useCallback((enabled: boolean) => {
+    loopEnabledRef.current = enabled
+    setLoopEnabledState(enabled)
+  }, [])
+
+  const setLoopStart = useCallback(() => {
+    const t = computeTime()
+    setLoop((prev) => {
+      const end = prev && prev.end > t ? prev.end : (songRef.current?.duration ?? t)
+      const next = { start: t, end }
+      loopRef.current = next
+      return next
+    })
+  }, [computeTime])
+
+  const setLoopEnd = useCallback(() => {
+    const t = computeTime()
+    setLoop((prev) => {
+      const start = prev && prev.start < t ? prev.start : 0
+      const next = { start, end: t }
+      loopRef.current = next
+      return next
+    })
+  }, [computeTime])
+
+  const clearLoop = useCallback(() => {
+    loopRef.current = null
+    setLoop(null)
+  }, [])
 
   const noteOn = useCallback((midi: number, velocity = 0.9) => {
     void ensureAudioStarted()
@@ -188,17 +323,30 @@ export function usePlaybackEngine() {
     releaseNote(midi)
   }, [])
 
+  // External controllers (hardware MIDI, computer keys) go through the octave shift.
+  const externalNoteOn = useCallback(
+    (midi: number, velocity = 0.9) => noteOn(midi + inputShiftRef.current * 12, velocity),
+    [noteOn],
+  )
+  const externalNoteOff = useCallback((midi: number) => noteOff(midi + inputShiftRef.current * 12), [noteOff])
+
+  useEffect(() => {
+    inputShiftRef.current = inputOctaveShift
+  }, [inputOctaveShift])
+
   // Hardware MIDI input.
   useEffect(() => {
     let cleanup: (() => void) | undefined
     connectMidiInputs(
-      { onNoteOn: (m, v) => noteOn(m, v), onNoteOff: (m) => noteOff(m) },
+      { onNoteOn: (m, v) => externalNoteOn(m, v), onNoteOff: (m) => externalNoteOff(m) },
       (names) => setMidiDevices(names),
     ).then((fn) => {
       cleanup = fn
     })
     return () => cleanup?.()
-  }, [noteOn, noteOff])
+  }, [externalNoteOn, externalNoteOff])
+
+  useEffect(() => cancelCountIn, [cancelCountIn])
 
   // Main animation loop.
   useEffect(() => {
@@ -234,15 +382,35 @@ export function usePlaybackEngine() {
       t = applyPracticeGate(t)
       const song = songRef.current
 
-      if (song && modeRef.current === 'listen' && playingRef.current) {
+      // Section loop: rewind as soon as the playhead leaves the region.
+      // A degenerate (zero-length or inverted) region is ignored, otherwise it
+      // would rewind on every single frame and freeze the playhead.
+      const activeLoop = loopRef.current
+      if (
+        song &&
+        playingRef.current &&
+        loopEnabledRef.current &&
+        activeLoop &&
+        activeLoop.end - activeLoop.start >= MIN_LOOP_SECONDS &&
+        t >= activeLoop.end
+      ) {
+        seek(activeLoop.start)
+        t = activeLoop.start
+      }
+
+      if (song && playingRef.current) {
+        const listening = modeRef.current === 'listen'
         const notes = song.notes
         let cursor = notesCursorRef.current
         let dirty = false
         while (cursor < notes.length && notes[cursor].time <= t) {
           const n = notes[cursor]
-          playNote(n.midi, n.velocity, n.duration)
-          soundingMapRef.current.set(n.midi, { endTime: n.time + n.duration, hand: n.hand })
-          dirty = true
+          // Listening plays everything; practising plays only the hand you're not training.
+          if (listening || !isActiveHand(n.hand)) {
+            playNote(n.midi, n.velocity, n.duration)
+            soundingMapRef.current.set(n.midi, { endTime: n.time + n.duration, hand: n.hand })
+            dirty = true
+          }
           cursor++
         }
         notesCursorRef.current = cursor
@@ -256,17 +424,24 @@ export function usePlaybackEngine() {
           setSoundingNotes(new Set(soundingMapRef.current.keys()))
           setSoundingHands(new Map([...soundingMapRef.current].map(([midi, info]) => [midi, info.hand])))
         }
+
+        if (metronomeRef.current) {
+          const secondsPerBeat = 60 / song.bpm
+          const beat = Math.floor(t / secondsPerBeat)
+          if (beat !== lastBeatRef.current) {
+            if (Number.isFinite(lastBeatRef.current)) playClick(beat % BEATS_PER_MEASURE === 0)
+            lastBeatRef.current = beat
+          }
+        }
       }
 
       // Progress counter advances with the playhead in both modes.
-      if (song) {
-        const notes = song.notes
-        let passed = notesPassedRef.current
-        while (passed < notes.length && notes[passed].time <= t) passed++
-        if (passed !== notesPassedRef.current) {
-          notesPassedRef.current = passed
-          setNotesPlayed(passed)
-        }
+      const active = activeNotesRef.current
+      let passed = notesPassedRef.current
+      while (passed < active.length && active[passed].time <= t) passed++
+      if (passed !== notesPassedRef.current) {
+        notesPassedRef.current = passed
+        setNotesPlayed(passed)
       }
 
       if (song && playingRef.current && t >= song.duration) {
@@ -280,13 +455,12 @@ export function usePlaybackEngine() {
 
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [computeTime, pauseAt, resumeFrom])
+  }, [computeTime, isActiveHand, pauseAt, resumeFrom, seek])
 
   const groups = groupsRef.current
   const nextRequiredNotes = useMemo((): Set<number> => {
     if (mode !== 'practice') return new Set()
-    const idx = clearedGroupIndex + 1
-    const group = groups[idx]
+    const group = groups[clearedGroupIndex + 1]
     if (!group) return new Set()
     return new Set(group.notes.map((n) => n.midi))
   }, [mode, clearedGroupIndex, groups])
@@ -314,17 +488,35 @@ export function usePlaybackEngine() {
     togglePlay,
     restart,
     seek,
+    seekBy,
     time,
     heldNotes,
     soundingNotes,
     soundingHands,
     noteOn,
     noteOff,
+    externalNoteOn,
+    externalNoteOff,
     midiDevices,
     nextRequiredNotes,
     nextRequiredTime,
     isWaitingForInput,
-    stats: { notesPlayed, totalNotes: song?.notes.length ?? 0, errors },
+    handFilter,
+    setHandFilter,
+    loop,
+    loopEnabled,
+    setLoopEnabled,
+    setLoopStart,
+    setLoopEnd,
+    clearLoop,
+    metronomeEnabled,
+    setMetronomeEnabled,
+    countInEnabled,
+    setCountInEnabled,
+    countInBeat,
+    inputOctaveShift,
+    setInputOctaveShift,
+    stats: { notesPlayed, totalNotes, errors },
     progress: song && song.duration > 0 ? time / song.duration : 0,
   }
 }

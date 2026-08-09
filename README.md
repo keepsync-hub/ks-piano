@@ -8,8 +8,26 @@ A falling-notes piano trainer that runs entirely in the browser.
 - Two ways to follow a song, switchable at any time: a falling-notes visualizer, or a real sheet-music (grand staff) view that auto-scrolls with a playhead, for reading practice
 - **Listen mode**: the song plays itself through a built-in synth
 - **Practice mode**: playback pauses at each note/chord until you play the right key(s), then continues
+- **One-hand practice**: train the left or right hand while the other plays as accompaniment
+- **Metronome** with accented downbeats and an optional count-in bar before playback
+- **A–B section looping** to drill a passage, with the region shown on the timeline
+- Beat/measure grid and adjustable zoom on the falling-notes stage
+- Live progress and error counters, current measure and key signature
 - Upload your own `.mid`/`.midi` files, or pick from a few built-in public-domain demo songs
-- Adjustable playback speed and seekable timeline
+- Adjustable playback speed, seekable timeline, and octave shift for small MIDI controllers
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `Space` | Play / pause |
+| `←` / `→` | Seek 5s (hold `Shift` for 1s) |
+| `R` / `Home` | Restart |
+| `M` | Toggle metronome |
+| `[` / `]` | Set loop start / end |
+| `X` | Clear loop |
+
+Letters `A`–`;` are reserved for playing notes on the computer keyboard.
 
 ## Getting started
 
