@@ -16,6 +16,25 @@ export interface LoopRegion {
   end: number
 }
 
+export interface HandMixerState {
+  /** 0-1 gain multiplier applied to this hand's auto-played notes. */
+  volume: number
+  muted: boolean
+}
+
+export interface MixerState {
+  left: HandMixerState
+  right: HandMixerState
+  /** When set, only this hand's auto-play is audible (subject to its own mute). */
+  solo: Hand | null
+}
+
+const DEFAULT_MIXER: MixerState = {
+  left: { volume: 1, muted: false },
+  right: { volume: 1, muted: false },
+  solo: null,
+}
+
 const GROUP_EPSILON = 0.05
 const COUNT_IN_BEATS = 4
 /** Shorter A–B regions are treated as unset rather than looping every frame. */
@@ -33,6 +52,20 @@ export function buildGroups(notes: NoteEvent[]): NoteGroup[] {
     }
   }
   return groups
+}
+
+/**
+ * Gain multiplier for a hand's auto-played notes — 0 if that hand is muted
+ * or another hand is soloed. Only ever applied to notes the app plays on its
+ * own (song playback); a user's own live input has no reliable hand
+ * association (a MIDI pitch alone can't tell you which hand played it) and
+ * is never scaled by this.
+ */
+export function getHandGain(mixer: MixerState, hand: Hand): number {
+  const entry = mixer[hand]
+  if (entry.muted) return 0
+  if (mixer.solo && mixer.solo !== hand) return 0
+  return entry.volume
 }
 
 interface PlaybackEngineCallbacks {
@@ -63,6 +96,7 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
   const [errors, setErrors] = useState(0)
 
   const [handFilter, setHandFilterState] = useState<HandFilter>('both')
+  const [mixer, setMixerState] = useState<MixerState>(DEFAULT_MIXER)
   const [loop, setLoop] = useState<LoopRegion | null>(null)
   const [loopEnabled, setLoopEnabledState] = useState(true)
   const [metronomeEnabled, setMetronomeEnabledState] = useState(false)
@@ -84,6 +118,7 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
   const requiredNotesRef = useRef<Set<number>>(new Set())
   const requiredTimeRef = useRef<number | null>(null)
   const handFilterRef = useRef<HandFilter>('both')
+  const mixerRef = useRef<MixerState>(DEFAULT_MIXER)
   const loopRef = useRef<LoopRegion | null>(null)
   const loopEnabledRef = useRef(true)
   const metronomeRef = useRef(false)
@@ -278,6 +313,31 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
     [computeTime, rebuildActiveSet],
   )
 
+  const setHandVolume = useCallback((hand: Hand, volume: number) => {
+    const clamped = Math.max(0, Math.min(1, volume))
+    setMixerState((prev) => {
+      const next = { ...prev, [hand]: { ...prev[hand], volume: clamped } }
+      mixerRef.current = next
+      return next
+    })
+  }, [])
+
+  const setHandMuted = useCallback((hand: Hand, muted: boolean) => {
+    setMixerState((prev) => {
+      const next = { ...prev, [hand]: { ...prev[hand], muted } }
+      mixerRef.current = next
+      return next
+    })
+  }, [])
+
+  const setHandSolo = useCallback((hand: Hand | null) => {
+    setMixerState((prev) => {
+      const next = { ...prev, solo: hand }
+      mixerRef.current = next
+      return next
+    })
+  }, [])
+
   const setMetronomeEnabled = useCallback(
     (enabled: boolean) => {
       metronomeRef.current = enabled
@@ -451,7 +511,10 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
           const n = notes[cursor]
           // Listening plays everything; practising plays only the hand you're not training.
           if (listening || !isActiveHand(n.hand)) {
-            playNote(n.midi, n.velocity, n.duration)
+            // The mixer only attenuates the app's own auto-play, never the
+            // user's live input (noteOn/externalNoteOn) — see getHandGain.
+            const gain = getHandGain(mixerRef.current, n.hand)
+            if (gain > 0) playNote(n.midi, n.velocity * gain, n.duration)
             soundingMapRef.current.set(n.midi, { endTime: n.time + n.duration, hand: n.hand, finger: n.finger })
             dirty = true
           }
@@ -569,6 +632,10 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
     isWaitingForInput,
     handFilter,
     setHandFilter,
+    mixer,
+    setHandVolume,
+    setHandMuted,
+    setHandSolo,
     loop,
     loopEnabled,
     setLoopEnabled,

@@ -258,6 +258,10 @@ function App() {
           <PracticeToolbar
             handFilter={engine.handFilter}
             onHandFilterChange={engine.setHandFilter}
+            mixer={engine.mixer}
+            onHandVolumeChange={engine.setHandVolume}
+            onHandMuteChange={engine.setHandMuted}
+            onHandSoloChange={engine.setHandSolo}
             metronomeEnabled={engine.metronomeEnabled}
             onMetronomeChange={engine.setMetronomeEnabled}
             countInEnabled={engine.countInEnabled}

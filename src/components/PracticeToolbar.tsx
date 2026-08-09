@@ -1,9 +1,14 @@
-import type { HandFilter, LoopRegion } from '../hooks/usePlaybackEngine'
+import type { HandFilter, LoopRegion, MixerState } from '../hooks/usePlaybackEngine'
+import type { Hand } from '../types'
 import './PracticeToolbar.css'
 
 interface PracticeToolbarProps {
   handFilter: HandFilter
   onHandFilterChange: (filter: HandFilter) => void
+  mixer: MixerState
+  onHandVolumeChange: (hand: Hand, volume: number) => void
+  onHandMuteChange: (hand: Hand, muted: boolean) => void
+  onHandSoloChange: (hand: Hand | null) => void
   metronomeEnabled: boolean
   onMetronomeChange: (enabled: boolean) => void
   countInEnabled: boolean
@@ -35,6 +40,10 @@ function formatTime(s: number): string {
 export function PracticeToolbar({
   handFilter,
   onHandFilterChange,
+  mixer,
+  onHandVolumeChange,
+  onHandMuteChange,
+  onHandSoloChange,
   metronomeEnabled,
   onMetronomeChange,
   countInEnabled,
@@ -70,6 +79,49 @@ export function PracticeToolbar({
             {h === 'both' ? 'Both' : h === 'left' ? 'Left' : 'Right'}
           </button>
         ))}
+      </div>
+
+      <div className="tool-group tool-group-mixer" role="group" aria-label="Hand mixer">
+        <span className="tool-label">Mixer</span>
+        <div className="mixer-rows">
+          {(['left', 'right'] as const).map((hand) => {
+            const entry = mixer[hand]
+            const soloed = mixer.solo === hand
+            return (
+              <div className="mixer-row" key={hand}>
+                <span className="mixer-hand">{hand === 'left' ? 'L' : 'R'}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={Math.round(entry.volume * 100)}
+                  disabled={entry.muted}
+                  onChange={(e) => onHandVolumeChange(hand, Number(e.target.value) / 100)}
+                  aria-label={`${hand} hand volume`}
+                />
+                <button
+                  type="button"
+                  className={entry.muted ? 'tool-btn tool-btn-active' : 'tool-btn'}
+                  onClick={() => onHandMuteChange(hand, !entry.muted)}
+                  title={`Mute ${hand} hand's auto-play — your own playing is never muted`}
+                  aria-pressed={entry.muted}
+                >
+                  Mute
+                </button>
+                <button
+                  type="button"
+                  className={soloed ? 'tool-btn tool-btn-active' : 'tool-btn'}
+                  onClick={() => onHandSoloChange(soloed ? null : hand)}
+                  title={`Solo ${hand} hand`}
+                  aria-pressed={soloed}
+                >
+                  Solo
+                </button>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div className="tool-group">

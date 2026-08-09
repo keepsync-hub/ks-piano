@@ -86,3 +86,30 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+.tool-group-mixer {
+  align-items: flex-start;
+}
+
+.mixer-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mixer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mixer-row input[type='range'] {
+  width: 80px;
+}
+
+.mixer-hand {
+  width: 12px;
+  color: #9aa0b0;
+  font-weight: 700;
+  font-size: 11px;
+}

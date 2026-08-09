@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { LoopRegion } from '../hooks/usePlaybackEngine'
 import type { SongProgress } from '../hooks/useProgress'
 import type { PlaybackMode, Song } from '../types'
@@ -46,6 +47,19 @@ export function TransportControls({
   onSpeedChange,
   onModeChange,
 }: TransportControlsProps) {
+  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement)
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void document.documentElement.requestFullscreen()
+  }
+
   return (
     <div className="transport">
       <div className="transport-row">
@@ -116,6 +130,16 @@ export function TransportControls({
           />
           <span>{speed.toFixed(2)}x</span>
         </label>
+
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          aria-pressed={isFullscreen}
+        >
+          {isFullscreen ? '⤡' : '⤢'}
+        </button>
       </div>
 
       <div className="transport-row transport-status">
