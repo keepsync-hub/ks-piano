@@ -43,6 +43,9 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
   const highlightsRef = useRef<HighlightEntry[]>([])
   const measureXRef = useRef<number[]>([])
   const scoreRef = useRef<ScoreLayout | null>(null)
+  const measureRectRef = useRef<SVGRectElement | null>(null)
+  const nowPlayingRectRef = useRef<SVGRectElement | null>(null)
+  const staveHeightRef = useRef(0)
 
   const score = useMemo(() => (song ? buildScore(song) : null), [song])
   scoreRef.current = score
@@ -57,10 +60,13 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
       host.innerHTML = ''
       highlightsRef.current = []
       measureXRef.current = []
+      measureRectRef.current = null
+      nowPlayingRectRef.current = null
       if (!score || score.measures.length === 0) return
 
       const containerHeight = scrollEl?.clientHeight || MIN_STAVE_HEIGHT
       const staveHeight = Math.max(MIN_STAVE_HEIGHT, Math.min(MAX_STAVE_HEIGHT, containerHeight))
+      staveHeightRef.current = staveHeight
       const trebleY = staveHeight * 0.09
       const bassY = staveHeight * 0.52
 
@@ -81,6 +87,22 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
       const highlightLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g')
       highlightLayer.setAttribute('class', 'sheet-highlights')
       svg?.insertBefore(highlightLayer, svg.firstChild)
+
+      // Current-measure tint and now-playing bar sit behind the individual note highlights.
+      const measureRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      measureRect.setAttribute('y', String(-6))
+      measureRect.setAttribute('height', String(staveHeight + 12))
+      measureRect.style.fill = 'transparent'
+      highlightLayer.appendChild(measureRect)
+      measureRectRef.current = measureRect
+
+      const nowPlayingRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      nowPlayingRect.setAttribute('y', String(-6))
+      nowPlayingRect.setAttribute('height', String(staveHeight + 12))
+      nowPlayingRect.setAttribute('rx', '5')
+      nowPlayingRect.style.fill = 'transparent'
+      highlightLayer.appendChild(nowPlayingRect)
+      nowPlayingRectRef.current = nowPlayingRect
 
       const entries: HighlightEntry[] = []
 
@@ -164,6 +186,16 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
       }
     }
 
+    const measureRect = measureRectRef.current
+    if (measureRect) {
+      measureRect.setAttribute('x', String(xs[measureIdx]))
+      measureRect.setAttribute('width', String(measureWidth))
+      measureRect.style.fill = 'rgba(63, 182, 255, 0.09)'
+    }
+
+    let playingMinX = Infinity
+    let playingMaxX = -Infinity
+
     for (const { rect, refs } of highlightsRef.current) {
       let fill = 'transparent'
       const anyRequired = refs.some((r) => requiredNotes.has(r.midi))
@@ -173,6 +205,24 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
       else if (anyRequired) fill = 'rgba(255, 184, 77, 0.55)'
       else if (anySounding) fill = `${HAND_FILL[refs[0].hand]}55`
       rect.style.fill = fill
+
+      if (anyHeld || anySounding) {
+        const rx = parseFloat(rect.getAttribute('x') ?? '0')
+        const rw = parseFloat(rect.getAttribute('width') ?? '0')
+        playingMinX = Math.min(playingMinX, rx)
+        playingMaxX = Math.max(playingMaxX, rx + rw)
+      }
+    }
+
+    const nowPlayingRect = nowPlayingRectRef.current
+    if (nowPlayingRect) {
+      if (playingMaxX > playingMinX) {
+        nowPlayingRect.setAttribute('x', String(playingMinX - 3))
+        nowPlayingRect.setAttribute('width', String(playingMaxX - playingMinX + 6))
+        nowPlayingRect.style.fill = 'rgba(63, 182, 255, 0.32)'
+      } else {
+        nowPlayingRect.style.fill = 'transparent'
+      }
     }
   }, [time, heldNotes, requiredNotes])
 
