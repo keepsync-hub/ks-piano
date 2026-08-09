@@ -9,17 +9,19 @@
 }
 
 .sheet-music-scroll {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
+  overflow: hidden;
 }
 
+/* Transformed via JS (translateX) so the score slides under the fixed
+   playhead below, notes moving right-to-left through it — rather than the
+   line moving and the container auto-scrolling to chase it. */
 .sheet-music-inner {
   position: relative;
   display: inline-block;
-  min-width: 100%;
+  will-change: transform;
 }
 
 .sheet-music-host svg {
@@ -32,11 +34,12 @@
   stroke: #14161b;
 }
 
+/* Fixed in place — must match PLAYHEAD_FRACTION in SheetMusic.tsx. */
 .sheet-music-playhead {
   position: absolute;
   top: 4px;
   bottom: 4px;
-  left: 0;
+  left: 30%;
   width: 2px;
   background: #d94a4a;
   pointer-events: none;

@@ -32,6 +32,15 @@ interface SheetMusicProps {
 /** How far from the playhead a note still counts as "the one being played now". */
 const NEAR_PLAYHEAD_SECONDS = 0.4
 
+/**
+ * Where the playhead sits, as a fraction of the viewport width — fixed in
+ * place by CSS (`.sheet-music-playhead`'s `left`). The score itself slides
+ * underneath it via a transform, notes moving right-to-left through it,
+ * rather than the old approach of moving the line and auto-scrolling to
+ * chase it.
+ */
+const PLAYHEAD_FRACTION = 0.3
+
 const MEASURE_MIN_WIDTH = 120
 /** Breathing room after the last glyph of a measure. */
 const MEASURE_PADDING = 24
@@ -91,8 +100,8 @@ export function SheetMusic({
   showFingering = false,
 }: SheetMusicProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
-  const playheadRef = useRef<HTMLDivElement>(null)
   const highlightsRef = useRef<HighlightEntry[]>([])
   const measureXRef = useRef<number[]>([])
   const scoreRef = useRef<ScoreLayout | null>(null)
@@ -102,6 +111,89 @@ export function SheetMusic({
 
   const score = useMemo(() => (song ? buildScore(song) : null), [song])
   scoreRef.current = score
+
+  // Read via a ref inside positionScore() so it stays correct even when
+  // called from the build effect below, whose closure only refreshes when
+  // `score`/`showFingering` change — not on every playback tick.
+  const latestRef = useRef({ time, heldNotes, requiredNotes, requiredTime })
+  latestRef.current = { time, heldNotes, requiredNotes, requiredTime }
+
+  /**
+   * Slides the score under the fixed playhead line so the note due "now"
+   * lines up with it, and updates the highlight fills. Safe to call from
+   * anywhere — it reads everything through refs rather than closured props.
+   */
+  function positionScore() {
+    const layout = scoreRef.current
+    const xs = measureXRef.current
+    const inner = innerRef.current
+    const scrollEl = scrollRef.current
+    if (!layout || !inner || !scrollEl || xs.length < 2) return
+
+    const { time, heldNotes, requiredNotes, requiredTime } = latestRef.current
+
+    // Locate the playhead through the measure time table, which already went
+    // through the tempo map, instead of assuming one constant tempo.
+    const starts = layout.measureStartSeconds
+    let measureIdx = 0
+    while (measureIdx < starts.length - 2 && starts[measureIdx + 1] <= time) measureIdx++
+    measureIdx = Math.min(measureIdx, xs.length - 2)
+    const measureSeconds = starts[measureIdx + 1] - starts[measureIdx]
+    const withinMeasure = measureSeconds > 0 ? (time - starts[measureIdx]) / measureSeconds : 0
+    const measureWidth = xs[measureIdx + 1] - xs[measureIdx]
+    const x = xs[measureIdx] + Math.max(0, Math.min(1, withinMeasure)) * measureWidth
+
+    // The playhead itself never moves (fixed by CSS `left`); the score slides
+    // underneath it instead, so notes travel right-to-left through the line.
+    const playheadX = scrollEl.clientWidth * PLAYHEAD_FRACTION
+    inner.style.transform = `translateX(${playheadX - x}px)`
+
+    const measureRect = measureRectRef.current
+    if (measureRect) {
+      measureRect.setAttribute('x', String(xs[measureIdx]))
+      measureRect.setAttribute('width', String(measureWidth))
+      measureRect.style.fill = MEASURE_TINT
+    }
+
+    let playingMinX = Infinity
+    let playingMaxX = -Infinity
+
+    for (const { rect, refs } of highlightsRef.current) {
+      let fill = 'transparent'
+      // Scoped by score time, otherwise every other occurrence of the same
+      // pitch elsewhere in the piece would light up too.
+      const anySounding = refs.some((r) => time >= r.time && time < r.time + r.duration)
+      const anyRequired =
+        requiredTime != null && refs.some((r) => requiredNotes.has(r.midi) && Math.abs(r.time - requiredTime) < 0.05)
+      const anyHeld = refs.some(
+        (r) =>
+          heldNotes.has(r.midi) &&
+          (Math.abs(r.time - time) < NEAR_PLAYHEAD_SECONDS || (time >= r.time && time < r.time + r.duration)),
+      )
+      if (anyHeld) fill = NOTE_TINTS.input
+      else if (anyRequired) fill = NOTE_TINTS.required
+      else if (anySounding) fill = NOTE_TINTS[refs[0].hand]
+      rect.style.fill = fill
+
+      if (anyHeld || anySounding) {
+        const rx = parseFloat(rect.getAttribute('x') ?? '0')
+        const rw = parseFloat(rect.getAttribute('width') ?? '0')
+        playingMinX = Math.min(playingMinX, rx)
+        playingMaxX = Math.max(playingMaxX, rx + rw)
+      }
+    }
+
+    const nowPlayingRect = nowPlayingRectRef.current
+    if (nowPlayingRect) {
+      if (playingMaxX > playingMinX) {
+        nowPlayingRect.setAttribute('x', String(playingMinX - 3))
+        nowPlayingRect.setAttribute('width', String(playingMaxX - playingMinX + 6))
+        nowPlayingRect.style.fill = NOW_PLAYING_TINT
+      } else {
+        nowPlayingRect.style.fill = 'transparent'
+      }
+    }
+  }
 
   useEffect(() => {
     const host = hostRef.current
@@ -258,105 +350,46 @@ export function SheetMusic({
       })
 
       highlightsRef.current = entries
+
+      // Re-align immediately after a rebuild (song change, fingering toggle,
+      // or a height-driven relayout) instead of waiting for the next tick.
+      positionScore()
     }
 
     render()
 
     // Only the height feeds the layout. Watching width too would re-render on
-    // the horizontal scrollbar that our own output creates — doubling the work
-    // on every load for no visual change.
+    // the horizontal scrollbar that our old auto-scroll approach created —
+    // doubling the work on every load for no visual change. We still call
+    // positionScore() on any size change so the transform-based offset stays
+    // aligned with the current viewport width.
     let lastHeight = scrollEl.clientHeight
     const ro = new ResizeObserver(() => {
       const height = scrollEl.clientHeight
-      if (height === lastHeight) return
-      lastHeight = height
-      render()
+      if (height !== lastHeight) {
+        lastHeight = height
+        render()
+      } else {
+        positionScore()
+      }
     })
     ro.observe(scrollEl)
     return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [score, showFingering])
 
   useLayoutEffect(() => {
-    const layout = scoreRef.current
-    const xs = measureXRef.current
-    const playhead = playheadRef.current
-    const scrollEl = scrollRef.current
-    if (!layout || !playhead || xs.length < 2) return
-
-    // Locate the playhead through the measure time table, which already went
-    // through the tempo map, instead of assuming one constant tempo.
-    const starts = layout.measureStartSeconds
-    let measureIdx = 0
-    while (measureIdx < starts.length - 2 && starts[measureIdx + 1] <= time) measureIdx++
-    measureIdx = Math.min(measureIdx, xs.length - 2)
-    const measureSeconds = starts[measureIdx + 1] - starts[measureIdx]
-    const withinMeasure = measureSeconds > 0 ? (time - starts[measureIdx]) / measureSeconds : 0
-    const measureWidth = xs[measureIdx + 1] - xs[measureIdx]
-    const x = xs[measureIdx] + Math.max(0, Math.min(1, withinMeasure)) * measureWidth
-
-    playhead.style.transform = `translateX(${x}px)`
-
-    if (scrollEl) {
-      const targetScroll = x - scrollEl.clientWidth * 0.3
-      if (Math.abs(scrollEl.scrollLeft - targetScroll) > 2) {
-        scrollEl.scrollLeft = Math.max(0, targetScroll)
-      }
-    }
-
-    const measureRect = measureRectRef.current
-    if (measureRect) {
-      measureRect.setAttribute('x', String(xs[measureIdx]))
-      measureRect.setAttribute('width', String(measureWidth))
-      measureRect.style.fill = MEASURE_TINT
-    }
-
-    let playingMinX = Infinity
-    let playingMaxX = -Infinity
-
-    for (const { rect, refs } of highlightsRef.current) {
-      let fill = 'transparent'
-      // Scoped by score time, otherwise every other occurrence of the same
-      // pitch elsewhere in the piece would light up too.
-      const anySounding = refs.some((r) => time >= r.time && time < r.time + r.duration)
-      const anyRequired =
-        requiredTime != null && refs.some((r) => requiredNotes.has(r.midi) && Math.abs(r.time - requiredTime) < 0.05)
-      const anyHeld = refs.some(
-        (r) =>
-          heldNotes.has(r.midi) &&
-          (Math.abs(r.time - time) < NEAR_PLAYHEAD_SECONDS || (time >= r.time && time < r.time + r.duration)),
-      )
-      if (anyHeld) fill = NOTE_TINTS.input
-      else if (anyRequired) fill = NOTE_TINTS.required
-      else if (anySounding) fill = NOTE_TINTS[refs[0].hand]
-      rect.style.fill = fill
-
-      if (anyHeld || anySounding) {
-        const rx = parseFloat(rect.getAttribute('x') ?? '0')
-        const rw = parseFloat(rect.getAttribute('width') ?? '0')
-        playingMinX = Math.min(playingMinX, rx)
-        playingMaxX = Math.max(playingMaxX, rx + rw)
-      }
-    }
-
-    const nowPlayingRect = nowPlayingRectRef.current
-    if (nowPlayingRect) {
-      if (playingMaxX > playingMinX) {
-        nowPlayingRect.setAttribute('x', String(playingMinX - 3))
-        nowPlayingRect.setAttribute('width', String(playingMaxX - playingMinX + 6))
-        nowPlayingRect.style.fill = NOW_PLAYING_TINT
-      } else {
-        nowPlayingRect.style.fill = 'transparent'
-      }
-    }
+    positionScore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [time, heldNotes, requiredNotes, requiredTime])
 
   return (
     <div className="sheet-music-wrap">
       <div className="sheet-music-scroll" ref={scrollRef}>
-        <div className="sheet-music-inner">
+        <div ref={innerRef} className="sheet-music-inner">
           <div ref={hostRef} className="sheet-music-host" />
-          <div ref={playheadRef} className="sheet-music-playhead" />
         </div>
+        <div className="sheet-music-playhead" />
       </div>
       {!song && <p className="sheet-music-empty">Load a song to see its sheet music.</p>}
     </div>
