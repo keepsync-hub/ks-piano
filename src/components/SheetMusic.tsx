@@ -16,9 +16,8 @@ const MEASURE_MIN_WIDTH = 140
 const WIDTH_PER_ELEMENT = 32
 const LEFT_MARGIN = 24
 const RIGHT_PADDING = 30
-const TREBLE_Y = 30
-const BASS_Y = 150
-const STAVE_HEIGHT = 260
+const MIN_STAVE_HEIGHT = 150
+const MAX_STAVE_HEIGHT = 320
 const HAND_FILL = { right: '#3fb6ff', left: '#ff5fa8' }
 
 interface HighlightEntry {
@@ -50,82 +49,97 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
 
   useEffect(() => {
     const host = hostRef.current
-    if (!host) return
-    host.innerHTML = ''
-    highlightsRef.current = []
-    measureXRef.current = []
-    if (!score || score.measures.length === 0) return
+    const scrollEl = scrollRef.current
+    if (!host || !scrollEl) return
 
-    const widths = score.measures.map((m) => {
-      const count = Math.max(m.treble.length, m.bass.length, 1)
-      return Math.max(MEASURE_MIN_WIDTH, 40 + count * WIDTH_PER_ELEMENT)
-    })
-    const xs: number[] = [LEFT_MARGIN]
-    for (const w of widths) xs.push(xs[xs.length - 1] + w)
-    measureXRef.current = xs
-    const totalWidth = xs[xs.length - 1] + RIGHT_PADDING
+    function render() {
+      if (!host) return
+      host.innerHTML = ''
+      highlightsRef.current = []
+      measureXRef.current = []
+      if (!score || score.measures.length === 0) return
 
-    const renderer = new Renderer(host, Renderer.Backends.SVG)
-    renderer.resize(totalWidth, STAVE_HEIGHT)
-    const context = renderer.getContext()
+      const containerHeight = scrollEl?.clientHeight || MIN_STAVE_HEIGHT
+      const staveHeight = Math.max(MIN_STAVE_HEIGHT, Math.min(MAX_STAVE_HEIGHT, containerHeight))
+      const trebleY = staveHeight * 0.09
+      const bassY = staveHeight * 0.52
 
-    const svg = host.querySelector('svg')
-    const highlightLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-    highlightLayer.setAttribute('class', 'sheet-highlights')
-    svg?.insertBefore(highlightLayer, svg.firstChild)
+      const widths = score.measures.map((m) => {
+        const count = Math.max(m.treble.length, m.bass.length, 1)
+        return Math.max(MEASURE_MIN_WIDTH, 40 + count * WIDTH_PER_ELEMENT)
+      })
+      const xs: number[] = [LEFT_MARGIN]
+      for (const w of widths) xs.push(xs[xs.length - 1] + w)
+      measureXRef.current = xs
+      const totalWidth = xs[xs.length - 1] + RIGHT_PADDING
 
-    const entries: HighlightEntry[] = []
+      const renderer = new Renderer(host, Renderer.Backends.SVG)
+      renderer.resize(totalWidth, staveHeight)
+      const context = renderer.getContext()
 
-    score.measures.forEach((measure, i) => {
-      const x = xs[i]
-      const width = widths[i]
-      const isFirst = i === 0
+      const svg = host.querySelector('svg')
+      const highlightLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+      highlightLayer.setAttribute('class', 'sheet-highlights')
+      svg?.insertBefore(highlightLayer, svg.firstChild)
 
-      const treble = new Stave(x, TREBLE_Y, width)
-      const bass = new Stave(x, BASS_Y, width)
-      if (isFirst) {
-        treble.addClef('treble')
-        treble.addTimeSignature('4/4')
-        bass.addClef('bass')
-        bass.addTimeSignature('4/4')
-      }
-      treble.setContext(context).draw()
-      bass.setContext(context).draw()
+      const entries: HighlightEntry[] = []
 
-      if (isFirst) {
-        new StaveConnector(treble, bass).setType('brace').setContext(context).draw()
-        new StaveConnector(treble, bass).setType('singleLeft').setContext(context).draw()
-      }
+      score.measures.forEach((measure, i) => {
+        const x = xs[i]
+        const width = widths[i]
+        const isFirst = i === 0
 
-      for (const [clef, staveEls, stave] of [
-        ['treble', measure.treble, treble],
-        ['bass', measure.bass, bass],
-      ] as const) {
-        if (staveEls.length === 0) continue
-        const vexNotes = staveEls.map((el) => buildVexNote(el, clef))
-        const voice = new Voice({ numBeats: UNITS_PER_MEASURE / 4, beatValue: 4 }).setStrict(false)
-        voice.addTickables(vexNotes)
-        new Formatter().joinVoices([voice]).format([voice], width - 20)
-        voice.draw(context, stave)
+        const treble = new Stave(x, trebleY, width)
+        const bass = new Stave(x, bassY, width)
+        if (isFirst) {
+          treble.addClef('treble')
+          treble.addTimeSignature('4/4')
+          bass.addClef('bass')
+          bass.addTimeSignature('4/4')
+        }
+        treble.setContext(context).draw()
+        bass.setContext(context).draw()
 
-        staveEls.forEach((el, idx) => {
-          if (el.kind !== 'note') return
-          const bbox = vexNotes[idx].getBoundingBox()
-          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-          rect.setAttribute('x', String(bbox.getX() - 4))
-          rect.setAttribute('y', String(bbox.getY() - 4))
-          rect.setAttribute('width', String(bbox.getW() + 8))
-          rect.setAttribute('height', String(bbox.getH() + 8))
-          rect.setAttribute('rx', '4')
-          rect.style.fill = 'transparent'
-          rect.style.stroke = 'none'
-          highlightLayer.appendChild(rect)
-          entries.push({ rect, refs: el.refs })
-        })
-      }
-    })
+        if (isFirst) {
+          new StaveConnector(treble, bass).setType('brace').setContext(context).draw()
+          new StaveConnector(treble, bass).setType('singleLeft').setContext(context).draw()
+        }
 
-    highlightsRef.current = entries
+        for (const [clef, staveEls, stave] of [
+          ['treble', measure.treble, treble],
+          ['bass', measure.bass, bass],
+        ] as const) {
+          if (staveEls.length === 0) continue
+          const vexNotes = staveEls.map((el) => buildVexNote(el, clef))
+          const voice = new Voice({ numBeats: UNITS_PER_MEASURE / 4, beatValue: 4 }).setStrict(false)
+          voice.addTickables(vexNotes)
+          new Formatter().joinVoices([voice]).format([voice], width - 20)
+          voice.draw(context, stave)
+
+          staveEls.forEach((el, idx) => {
+            if (el.kind !== 'note') return
+            const bbox = vexNotes[idx].getBoundingBox()
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+            rect.setAttribute('x', String(bbox.getX() - 4))
+            rect.setAttribute('y', String(bbox.getY() - 4))
+            rect.setAttribute('width', String(bbox.getW() + 8))
+            rect.setAttribute('height', String(bbox.getH() + 8))
+            rect.setAttribute('rx', '4')
+            rect.style.fill = 'transparent'
+            rect.style.stroke = 'none'
+            highlightLayer.appendChild(rect)
+            entries.push({ rect, refs: el.refs })
+          })
+        }
+      })
+
+      highlightsRef.current = entries
+    }
+
+    render()
+    const ro = new ResizeObserver(() => render())
+    ro.observe(scrollEl)
+    return () => ro.disconnect()
   }, [score])
 
   useLayoutEffect(() => {
