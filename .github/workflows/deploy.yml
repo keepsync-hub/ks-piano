@@ -10,7 +10,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Scoped per ref: pushes to other branches create runs that skip the jobs
+  # below, and an unscoped group would let them cancel a real deployment.
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
