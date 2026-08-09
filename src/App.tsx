@@ -1,15 +1,17 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaybackEngine } from './hooks/usePlaybackEngine'
 import { useComputerKeyboard } from './hooks/useComputerKeyboard'
 import { useShortcuts } from './hooks/useShortcuts'
 import { useProgress } from './hooks/useProgress'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import { useWorkout } from './hooks/useWorkout'
 import { DEMO_SONGS } from './midi/demoSongs'
 import { SongLibrary } from './components/SongLibrary'
 import { PianoKeyboard } from './components/PianoKeyboard'
 import { FallingNotes } from './components/FallingNotes'
 import { TransportControls } from './components/TransportControls'
 import { PracticeToolbar } from './components/PracticeToolbar'
+import { WorkoutPanel } from './components/WorkoutPanel'
 import { Legend } from './components/Legend'
 import './App.css'
 
@@ -21,6 +23,8 @@ type StageView = 'falling' | 'sheet' | 'both'
 function App() {
   const { recordSongResult, recordPractice, stats, getSongProgress } = useProgress()
   const [errorFlash, setErrorFlash] = useState<number | null>(null)
+  const workoutCompleteRef = useRef<(() => void) | null>(null)
+  const workoutNoteRef = useRef<((correct: boolean) => void) | null>(null)
 
   const engine = usePlaybackEngine({
     onError: (midi) => {
@@ -30,9 +34,18 @@ function App() {
     onSongComplete: (songId, errors) => {
       recordSongResult(songId, errors, true)
       recordPractice(engine.song?.duration ?? 0)
+      workoutCompleteRef.current?.()
+    },
+    onNotePlayed: (_midi, correct) => {
+      workoutNoteRef.current?.(correct)
     },
   })
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
+
+  const workout = useWorkout(DEMO_SONGS, engine.loadSong, engine.setMode)
+  workoutCompleteRef.current = workout.recordSongComplete
+  workoutNoteRef.current = workout.recordNote
+
   const [view, setView] = useLocalStorage<StageView>('ks-piano-view', 'falling')
   const [lookaheadSeconds, setLookaheadSeconds] = useLocalStorage('ks-piano-lookahead', 3.5)
   const [showMeasureLines, setShowMeasureLines] = useLocalStorage('ks-piano-measure-lines', true)
@@ -192,6 +205,14 @@ function App() {
             onSeek={engine.seek}
             onSpeedChange={engine.setSpeed}
             onModeChange={engine.setMode}
+          />
+          <WorkoutPanel
+            phase={workout.phase}
+            timeLeft={workout.formattedTimeLeft}
+            stats={workout.stats}
+            onStart={workout.startWorkout}
+            onStop={workout.stopWorkout}
+            onNextSong={workout.nextSong}
           />
           <PracticeToolbar
             handFilter={engine.handFilter}

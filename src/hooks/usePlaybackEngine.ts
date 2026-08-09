@@ -38,6 +38,7 @@ export function buildGroups(notes: NoteEvent[]): NoteGroup[] {
 interface PlaybackEngineCallbacks {
   onError?: (midi: number) => void
   onSongComplete?: (songId: string, errors: number) => void
+  onNotePlayed?: (midi: number, correct: boolean) => void
 }
 
 export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
@@ -347,11 +348,13 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
 
         // In practice mode, a key that isn't part of the note we're waiting on is a miss.
         const required = requiredNotesRef.current
+        const isCorrect = required.size === 0 || required.has(midi)
         if (modeRef.current === 'practice' && required.size > 0 && !required.has(midi)) {
           errorsRef.current += 1
           setErrors(errorsRef.current)
           callbacksRef.current?.onError?.(midi)
         }
+        callbacksRef.current?.onNotePlayed?.(midi, isCorrect)
       }
       playNote(midi, velocity)
     },
