@@ -1,26 +1,6 @@
-import type { Hand, NoteEvent, Song } from '../types'
-import { noteNameToMidi } from './noteName'
-
-interface BeatNote {
-  note: string
-  beat: number
-  beats: number
-  hand: Hand
-}
-
-function buildSong(id: string, title: string, composer: string, bpm: number, beatNotes: BeatNote[]): Song {
-  const secondsPerBeat = 60 / bpm
-  const notes: NoteEvent[] = beatNotes.map((n) => ({
-    midi: noteNameToMidi(n.note),
-    time: n.beat * secondsPerBeat,
-    duration: n.beats * secondsPerBeat * 0.92,
-    velocity: 0.75,
-    hand: n.hand,
-  }))
-  notes.sort((a, b) => a.time - b.time)
-  const duration = Math.max(...notes.map((n) => n.time + n.duration)) + 1
-  return { id, title, composer, notes, duration, bpm, keySignature: 'C Major' }
-}
+import type { Hand, Song } from '../types'
+import { buildSong } from './buildSong'
+import { ADULT_PIANO_ADVENTURES_BOOK1_SONGS } from './adultPianoAdventuresBook1'
 
 // Simple right-hand-only warm-up exercise.
 const scaleWarmup = buildSong('demo-scale', 'C Major Scale Warm-up', 'Traditional exercise', 84, [
@@ -144,4 +124,11 @@ for (let bar = 0; bar < 4; bar++) {
 }
 const arpeggioEtude = buildSong('demo-arpeggio-etude', 'Two-Hand Arpeggio Étude', 'Original exercise', 132, arpeggioNotes)
 
-export const DEMO_SONGS: Song[] = [scaleWarmup, maryHadALittleLamb, twinkle, odeToJoy, arpeggioEtude]
+export const DEMO_SONGS: Song[] = [
+  scaleWarmup,
+  maryHadALittleLamb,
+  twinkle,
+  odeToJoy,
+  arpeggioEtude,
+  ...ADULT_PIANO_ADVENTURES_BOOK1_SONGS,
+]

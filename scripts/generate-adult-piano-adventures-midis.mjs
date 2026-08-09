@@ -88,11 +88,9 @@ function pentascaleWarmup(id, title, rootNote, steps, bpm) {
     const isLast = i === degrees.length - 1
     beatNotes.push({ note, beat: 5 + i, beats: isLast ? 2 : 1, hand: 'right' })
   })
-  // Left hand: sustained root + fifth dyad under the whole pattern.
-  const fifth = midiToName(transposeUp(root - 12, steps[4]))
+  // Left hand: sustained root note under the whole pattern.
   const rootLow = midiToName(root - 12)
   beatNotes.push({ note: rootLow, beat: 0, beats: 10, hand: 'left' })
-  beatNotes.push({ note: fifth, beat: 0, beats: 10, hand: 'left' })
   writeSong({ id, title, composer: 'Ejercicio técnico (dominio propio)', bpm, timeSignature: [4, 4], beatNotes })
 }
 

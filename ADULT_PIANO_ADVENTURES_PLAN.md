@@ -52,16 +52,29 @@ de teoría ni escaneos. Para las **32 sesiones** hice esto:
    *Russian Sailor's Dance*) — no generé nada; la tabla de abajo indica que hay que **buscar y
    cargar el MIDI manualmente** (con la función "Upload your own .mid/.midi" que ya tiene la app).
 
-## Cómo usar los archivos generados
+## Cómo usar el repertorio generado
 
-Los `.mid` están en [`practice-plans/adult-piano-adventures-book1/midi/`](practice-plans/adult-piano-adventures-book1/midi/)
-(18 archivos), generados por [`scripts/generate-adult-piano-adventures-midis.mjs`](scripts/generate-adult-piano-adventures-midis.mjs)
-(`node scripts/generate-adult-piano-adventures-midis.mjs` los regenera). Cárgalos con el botón
-**"Upload your own .mid/.midi files"** de `ks-piano` — cada archivo tiene la mano derecha e
-izquierda en pistas separadas para que el reparto por manos se detecte solo. Cinco sesiones
-reutilizan canciones que ya están incluidas en la app (`src/midi/demoSongs.ts`): *Mary Had a
-Little Lamb*, *Twinkle Twinkle Little Star*, *Ode to Joy* y el *Two-Hand Arpeggio Étude*,
-seleccionables directo desde la librería de canciones sin subir nada.
+Las 18 piezas/ejercicios ya están **integradas en la librería de canciones de la app**
+(`src/midi/adultPianoAdventuresBook1.ts`, sumadas a `DEMO_SONGS` en `src/midi/demoSongs.ts`), así
+que aparecen directo en la lista de canciones agrupadas por Tier — no hace falta subir nada a
+mano. El mismo contenido también se exporta como `.mid` real en
+[`practice-plans/adult-piano-adventures-book1/midi/`](practice-plans/adult-piano-adventures-book1/midi/),
+regenerable con `node scripts/generate-adult-piano-adventures-midis.mjs`, por si se quiere abrir en
+otro programa o cargarlo con **"Upload your own .mid/.midi files"**. Cinco sesiones reutilizan
+canciones que ya estaban en la app antes de este plan: *Mary Had a Little Lamb*, *Twinkle Twinkle
+Little Star*, *Ode to Joy* y el *Two-Hand Arpeggio Étude*.
+
+Los Tiers de la librería (`src/piano/skillPath.ts`) se calculan automáticamente a partir de la
+densidad de notas, el rango, los acordes y el tempo de cada pieza (`src/piano/difficulty.ts`) — no
+son asignados a mano por unidad. Con las 18 piezas nuevas sumadas, la distribución quedó así:
+
+| Tier | Piezas |
+|---|---|
+| 1 · Beginner | C Major Scale Warm-up, Mary Had a Little Lamb |
+| 2 · Easy | Twinkle Twinkle, Ode to Joy, Merrily We Roll Along, Row Row Row Your Boat, Hot Cross Buns, Amazing Grace, Danny Boy, Greensleeves, The Entertainer (motivo), y los 6 calentamientos de pentacordio (Do/Sol/Fa/Re/La/La menor) |
+| 3 · Intermediate | Eine Kleine Nachtmusik (motivo), The Can-Can (motivo) |
+| 4 · Advanced | Two-Hand Arpeggio Étude, cadencia I–IV–V7–I en Do, cadencia I–IV–V7–I en Sol, escala de Do + cadencia final |
+| 5 · Expert | (vacío — ya lo estaba antes de este plan; ninguna canción de la librería llega a ese nivel de exigencia) |
 
 ## Estructura de las 32 sesiones
 
