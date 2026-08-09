@@ -8,6 +8,9 @@ export interface ShortcutHandlers {
   onSetLoopStart: () => void
   onSetLoopEnd: () => void
   onClearLoop: () => void
+  onToggleFingering: () => void
+  /** Digits 1-5 set the finger on the note practice mode is waiting for. */
+  onSetFinger: (finger: number) => void
 }
 
 /**
@@ -43,7 +46,17 @@ export function useShortcuts(handlers: ShortcutHandlers) {
           return
       }
 
+      if (e.key >= '1' && e.key <= '5') {
+        e.preventDefault()
+        handlers.onSetFinger(Number(e.key))
+        return
+      }
+
       switch (e.key.toLowerCase()) {
+        case 'n':
+          e.preventDefault()
+          handlers.onToggleFingering()
+          break
         case 'r':
           e.preventDefault()
           handlers.onRestart()

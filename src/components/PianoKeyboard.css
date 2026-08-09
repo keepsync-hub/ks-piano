@@ -56,7 +56,9 @@
 
 /* Indicator dot shown on any key that is lit up. */
 .key-dot {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 60%;
   max-width: 14px;
   aspect-ratio: 1;
@@ -65,6 +67,23 @@
   background: var(--key-color, #fff);
   box-shadow: 0 0 6px var(--key-color, #fff);
   pointer-events: none;
+}
+
+/* When a fingering is known the dot grows to carry the digit. */
+.key-dot-finger {
+  width: 82%;
+  max-width: 19px;
+  margin-bottom: 8%;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
+}
+
+.key-white .key-dot-finger {
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
 }
 
 .key-on-left {

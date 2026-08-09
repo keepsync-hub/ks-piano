@@ -19,6 +19,8 @@ interface PracticeToolbarProps {
   onLookaheadChange: (seconds: number) => void
   showMeasureLines: boolean
   onMeasureLinesChange: (show: boolean) => void
+  showFingering: boolean
+  onFingeringChange: (show: boolean) => void
   inputOctaveShift: number
   onInputOctaveShiftChange: (shift: number) => void
   hasMidiDevice: boolean
@@ -48,6 +50,8 @@ export function PracticeToolbar({
   onLookaheadChange,
   showMeasureLines,
   onMeasureLinesChange,
+  showFingering,
+  onFingeringChange,
   inputOctaveShift,
   onInputOctaveShiftChange,
   hasMidiDevice,
@@ -131,6 +135,19 @@ export function PracticeToolbar({
           />
           Beat lines
         </label>
+      </div>
+
+      <div className="tool-group">
+        <span className="tool-label">Fingering</span>
+        <button
+          type="button"
+          className={showFingering ? 'tool-btn tool-btn-active' : 'tool-btn'}
+          onClick={() => onFingeringChange(!showFingering)}
+          title="Show suggested finger numbers on the keys and score (N)"
+        >
+          {showFingering ? 'On' : 'Off'}
+        </button>
+        {showFingering && <span className="tool-hint">Press 1–5 while practising to correct</span>}
       </div>
 
       {hasMidiDevice && (

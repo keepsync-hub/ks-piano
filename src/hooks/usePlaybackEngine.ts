@@ -3,6 +3,7 @@ import type { Hand, NoteEvent, PlaybackMode, Song } from '../types'
 import { ensureAudioStarted, playNote, releaseNote } from '../audio/synth'
 import { playClick } from '../audio/metronome'
 import { connectMidiInputs } from '../audio/midiInput'
+import { withSuggestedFingering } from '../piano/fingering'
 
 interface NoteGroup {
   time: number
@@ -44,6 +45,7 @@ export function usePlaybackEngine() {
   const [heldNotes, setHeldNotes] = useState<Set<number>>(new Set())
   const [soundingNotes, setSoundingNotes] = useState<Set<number>>(new Set())
   const [soundingHands, setSoundingHands] = useState<Map<number, Hand>>(new Map())
+  const [soundingFingers, setSoundingFingers] = useState<Map<number, number>>(new Map())
   const [clearedGroupIndex, setClearedGroupIndex] = useState(-1)
   const [midiDevices, setMidiDevices] = useState<string[]>([])
   const [notesPlayed, setNotesPlayed] = useState(0)
@@ -70,6 +72,7 @@ export function usePlaybackEngine() {
   const notesPassedRef = useRef(0)
   const errorsRef = useRef(0)
   const requiredNotesRef = useRef<Set<number>>(new Set())
+  const requiredTimeRef = useRef<number | null>(null)
   const handFilterRef = useRef<HandFilter>('both')
   const loopRef = useRef<LoopRegion | null>(null)
   const loopEnabledRef = useRef(true)
@@ -77,7 +80,7 @@ export function usePlaybackEngine() {
   const lastBeatRef = useRef(Number.NEGATIVE_INFINITY)
   const inputShiftRef = useRef(0)
   const countInTimersRef = useRef<number[]>([])
-  const soundingMapRef = useRef<Map<number, { endTime: number; hand: Hand }>>(new Map())
+  const soundingMapRef = useRef<Map<number, { endTime: number; hand: Hand; finger?: number }>>(new Map())
   const clockRef = useRef<{ baseTime: number; startedAt: number | null }>({ baseTime: 0, startedAt: null })
 
   const isActiveHand = useCallback(
@@ -135,6 +138,7 @@ export function usePlaybackEngine() {
     soundingMapRef.current.clear()
     setSoundingNotes(new Set())
     setSoundingHands(new Map())
+    setSoundingFingers(new Map())
   }, [])
 
   /** Rebuilds the practice target set whenever the song or the hand filter changes. */
@@ -151,7 +155,9 @@ export function usePlaybackEngine() {
   )
 
   const loadSong = useCallback(
-    (newSong: Song) => {
+    (incoming: Song) => {
+      // Songs arrive without fingering, so suggest one up front; it stays editable.
+      const newSong = withSuggestedFingering(incoming)
       songRef.current = newSong
       clockRef.current = { baseTime: 0, startedAt: null }
       playingRef.current = false
@@ -301,6 +307,28 @@ export function usePlaybackEngine() {
     setLoop(null)
   }, [])
 
+  /**
+   * Overrides the suggested finger on the note(s) practice mode is waiting for,
+   * so a wrong guess can be corrected in the flow of practising.
+   */
+  const setFingerForCurrent = useCallback(
+    (finger: number) => {
+      const current = songRef.current
+      const groupTime = requiredTimeRef.current
+      if (!current || groupTime === null) return
+
+      // Only the note objects change, not their timing or grouping, so the
+      // practice cursors are deliberately left untouched.
+      const notes = current.notes.map((n) =>
+        Math.abs(n.time - groupTime) < GROUP_EPSILON && isActiveHand(n.hand) ? { ...n, finger } : n,
+      )
+      const updated = { ...current, notes }
+      songRef.current = updated
+      setSongState(updated)
+    },
+    [isActiveHand],
+  )
+
   const noteOn = useCallback((midi: number, velocity = 0.9) => {
     void ensureAudioStarted()
     if (!heldNotesRef.current.has(midi)) {
@@ -408,7 +436,7 @@ export function usePlaybackEngine() {
           // Listening plays everything; practising plays only the hand you're not training.
           if (listening || !isActiveHand(n.hand)) {
             playNote(n.midi, n.velocity, n.duration)
-            soundingMapRef.current.set(n.midi, { endTime: n.time + n.duration, hand: n.hand })
+            soundingMapRef.current.set(n.midi, { endTime: n.time + n.duration, hand: n.hand, finger: n.finger })
             dirty = true
           }
           cursor++
@@ -423,6 +451,13 @@ export function usePlaybackEngine() {
         if (dirty) {
           setSoundingNotes(new Set(soundingMapRef.current.keys()))
           setSoundingHands(new Map([...soundingMapRef.current].map(([midi, info]) => [midi, info.hand])))
+          setSoundingFingers(
+            new Map(
+              [...soundingMapRef.current]
+                .filter(([, info]) => info.finger !== undefined)
+                .map(([midi, info]) => [midi, info.finger as number]),
+            ),
+          )
         }
 
         if (metronomeRef.current) {
@@ -471,7 +506,18 @@ export function usePlaybackEngine() {
     return groups[clearedGroupIndex + 1]?.time ?? null
   }, [mode, clearedGroupIndex, groups])
 
+  /** Finger to show on each lit key: the note you must play next wins over one merely sounding. */
+  const keyFingers = useMemo((): Map<number, number> => {
+    const merged = new Map(soundingFingers)
+    const group = mode === 'practice' ? groups[clearedGroupIndex + 1] : undefined
+    for (const n of group?.notes ?? []) {
+      if (n.finger !== undefined) merged.set(n.midi, n.finger)
+    }
+    return merged
+  }, [soundingFingers, mode, clearedGroupIndex, groups])
+
   requiredNotesRef.current = nextRequiredNotes
+  requiredTimeRef.current = nextRequiredTime
 
   const isWaitingForInput = mode === 'practice' && !playing && nextRequiredNotes.size > 0
 
@@ -493,8 +539,10 @@ export function usePlaybackEngine() {
     heldNotes,
     soundingNotes,
     soundingHands,
+    keyFingers,
     noteOn,
     noteOff,
+    setFingerForCurrent,
     externalNoteOn,
     externalNoteOff,
     midiDevices,

@@ -1,7 +1,21 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { Accidental, Formatter, Renderer, Stave, StaveConnector, StaveNote, Voice } from 'vexflow'
+import {
+  Accidental,
+  Beam,
+  Dot,
+  Formatter,
+  Fraction,
+  FretHandFinger,
+  Modifier,
+  Renderer,
+  Stave,
+  StaveConnector,
+  StaveNote,
+  StaveTie,
+  Voice,
+} from 'vexflow'
 import type { ScoreElement, ScoreLayout } from '../notation/buildScore'
-import { buildScore, UNITS_PER_MEASURE } from '../notation/buildScore'
+import { buildScore } from '../notation/buildScore'
 import type { NoteEvent, Song } from '../types'
 import './SheetMusic.css'
 
@@ -12,13 +26,17 @@ interface SheetMusicProps {
   requiredNotes: Set<number>
   /** Score time of the required group, so only that occurrence is highlighted. */
   requiredTime?: number | null
+  showFingering?: boolean
 }
 
 /** How far from the playhead a note still counts as "the one being played now". */
 const NEAR_PLAYHEAD_SECONDS = 0.4
 
-const MEASURE_MIN_WIDTH = 140
-const WIDTH_PER_ELEMENT = 32
+const MEASURE_MIN_WIDTH = 120
+/** Breathing room after the last glyph of a measure. */
+const MEASURE_PADDING = 24
+/** Extra room in measure 1 for the clef and time signature. */
+const FIRST_MEASURE_LEAD_IN = 56
 const LEFT_MARGIN = 24
 const RIGHT_PADDING = 30
 const MIN_STAVE_HEIGHT = 150
@@ -38,18 +56,40 @@ interface HighlightEntry {
   refs: NoteEvent[]
 }
 
-function buildVexNote(el: ScoreElement, clef: 'treble' | 'bass'): StaveNote {
+function buildVexNote(el: ScoreElement, clef: 'treble' | 'bass', showFingering: boolean): StaveNote {
   if (el.kind === 'rest') {
-    return new StaveNote({ keys: [clef === 'treble' ? 'b/4' : 'd/3'], duration: `${el.vfDuration}r`, clef })
+    const rest = new StaveNote({
+      keys: [clef === 'treble' ? 'b/4' : 'd/3'],
+      duration: `${el.vfDuration}r`,
+      clef,
+    })
+    if (el.dots) Dot.buildAndAttach([rest], { all: true })
+    return rest
   }
   const note = new StaveNote({ keys: el.keys, duration: el.vfDuration, clef })
+  if (el.dots) Dot.buildAndAttach([note], { all: true })
   el.accidentals.forEach((acc, i) => {
     if (acc) note.addModifier(new Accidental(acc), i)
   })
+  if (showFingering) {
+    // Convention: right-hand fingering above the treble staff, left-hand below the bass.
+    const position = clef === 'treble' ? Modifier.Position.ABOVE : Modifier.Position.BELOW
+    el.refs.forEach((ref, i) => {
+      if (!ref.finger) return
+      note.addModifier(new FretHandFinger(String(ref.finger)).setPosition(position), i)
+    })
+  }
   return note
 }
 
-export function SheetMusic({ song, time, heldNotes, requiredNotes, requiredTime }: SheetMusicProps) {
+export function SheetMusic({
+  song,
+  time,
+  heldNotes,
+  requiredNotes,
+  requiredTime,
+  showFingering = false,
+}: SheetMusicProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const playheadRef = useRef<HTMLDivElement>(null)
@@ -83,9 +123,36 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes, requiredTime 
       const trebleY = staveHeight * 0.09
       const bassY = staveHeight * 0.52
 
-      const widths = score.measures.map((m) => {
-        const count = Math.max(m.treble.length, m.bass.length, 1)
-        return Math.max(MEASURE_MIN_WIDTH, 40 + count * WIDTH_PER_ELEMENT)
+      // Pass 1 — build both hands' voices per measure and ask VexFlow how much
+      // room they actually need. Sizing from a glyph count instead would let
+      // dense measures (or fingering marks) overflow their barlines.
+      const built = score.measures.map((measure) => {
+        const trebleNotes = measure.treble.map((el) => buildVexNote(el, 'treble', showFingering))
+        const bassNotes = measure.bass.map((el) => buildVexNote(el, 'bass', showFingering))
+        const voices: Voice[] = []
+        const makeVoice = (notes: StaveNote[]) => {
+          const voice = new Voice({
+            numBeats: score.timeSignature[0],
+            beatValue: score.timeSignature[1],
+          }).setStrict(false)
+          voice.addTickables(notes)
+          return voice
+        }
+        const trebleVoice = trebleNotes.length ? makeVoice(trebleNotes) : null
+        const bassVoice = bassNotes.length ? makeVoice(bassNotes) : null
+        if (trebleVoice) voices.push(trebleVoice)
+        if (bassVoice) voices.push(bassVoice)
+
+        // One formatter across both staves keeps the hands vertically aligned.
+        const formatter = new Formatter()
+        for (const voice of voices) formatter.joinVoices([voice])
+        const minWidth = voices.length ? formatter.preCalculateMinTotalWidth(voices) : MEASURE_MIN_WIDTH
+        return { trebleNotes, bassNotes, trebleVoice, bassVoice, voices, formatter, minWidth }
+      })
+
+      const widths = built.map((b, i) => {
+        const leadIn = i === 0 ? FIRST_MEASURE_LEAD_IN : 0
+        return Math.max(MEASURE_MIN_WIDTH, Math.ceil(b.minWidth) + MEASURE_PADDING + leadIn)
       })
       const xs: number[] = [LEFT_MARGIN]
       for (const w of widths) xs.push(xs[xs.length - 1] + w)
@@ -119,18 +186,21 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes, requiredTime 
 
       const entries: HighlightEntry[] = []
 
+      // Pass 2 — place the staves at their computed widths and engrave.
       score.measures.forEach((measure, i) => {
         const x = xs[i]
         const width = widths[i]
         const isFirst = i === 0
+        const b = built[i]
 
         const treble = new Stave(x, trebleY, width)
         const bass = new Stave(x, bassY, width)
         if (isFirst) {
+          const timeSpec = `${score.timeSignature[0]}/${score.timeSignature[1]}`
           treble.addClef('treble')
-          treble.addTimeSignature('4/4')
+          treble.addTimeSignature(timeSpec)
           bass.addClef('bass')
-          bass.addTimeSignature('4/4')
+          bass.addTimeSignature(timeSpec)
         }
         treble.setContext(context).draw()
         bass.setContext(context).draw()
@@ -140,16 +210,35 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes, requiredTime 
           new StaveConnector(treble, bass).setType('singleLeft').setContext(context).draw()
         }
 
-        for (const [clef, staveEls, stave] of [
-          ['treble', measure.treble, treble],
-          ['bass', measure.bass, bass],
+        b.trebleVoice?.setStave(treble)
+        b.bassVoice?.setStave(bass)
+        if (b.voices.length) {
+          const noteAreaStart = isFirst ? treble.getNoteStartX() - x : 0
+          b.formatter.format(b.voices, Math.max(20, width - MEASURE_PADDING - noteAreaStart))
+        }
+
+        for (const [staveEls, stave, vexNotes, voice] of [
+          [measure.treble, treble, b.trebleNotes, b.trebleVoice],
+          [measure.bass, bass, b.bassNotes, b.bassVoice],
         ] as const) {
-          if (staveEls.length === 0) continue
-          const vexNotes = staveEls.map((el) => buildVexNote(el, clef))
-          const voice = new Voice({ numBeats: UNITS_PER_MEASURE / 4, beatValue: 4 }).setStrict(false)
-          voice.addTickables(vexNotes)
-          new Formatter().joinVoices([voice]).format([voice], width - 20)
+          if (!voice || staveEls.length === 0) continue
+
+          // Beam eighths and shorter within each beat instead of drawing loose flags.
+          const beams = Beam.generateBeams(vexNotes, {
+            // Compound meters (6/8, 12/8) group in dotted-quarter beats.
+            groups: [score.timeSignature[1] === 8 ? new Fraction(3, 8) : new Fraction(1, 4)],
+            maintainStemDirections: true,
+          })
           voice.draw(context, stave)
+          for (const beam of beams) beam.setContext(context).draw()
+
+          // Tie note heads that were split across a barline or a beat boundary.
+          staveEls.forEach((el, idx) => {
+            if (el.kind !== 'note' || !el.tiedFromPrevious || idx === 0) return
+            const prev = vexNotes[idx - 1]
+            if (!prev) return
+            new StaveTie({ firstNote: prev, lastNote: vexNotes[idx] }).setContext(context).draw()
+          })
 
           staveEls.forEach((el, idx) => {
             if (el.kind !== 'note') return
@@ -172,10 +261,20 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes, requiredTime 
     }
 
     render()
-    const ro = new ResizeObserver(() => render())
+
+    // Only the height feeds the layout. Watching width too would re-render on
+    // the horizontal scrollbar that our own output creates — doubling the work
+    // on every load for no visual change.
+    let lastHeight = scrollEl.clientHeight
+    const ro = new ResizeObserver(() => {
+      const height = scrollEl.clientHeight
+      if (height === lastHeight) return
+      lastHeight = height
+      render()
+    })
     ro.observe(scrollEl)
     return () => ro.disconnect()
-  }, [score])
+  }, [score, showFingering])
 
   useLayoutEffect(() => {
     const layout = scoreRef.current
@@ -184,9 +283,14 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes, requiredTime 
     const scrollEl = scrollRef.current
     if (!layout || !playhead || xs.length < 2) return
 
-    const unit = time / layout.secondsPerUnit
-    const measureIdx = Math.min(xs.length - 2, Math.floor(unit / UNITS_PER_MEASURE))
-    const withinMeasure = (unit - measureIdx * UNITS_PER_MEASURE) / UNITS_PER_MEASURE
+    // Locate the playhead through the measure time table, which already went
+    // through the tempo map, instead of assuming one constant tempo.
+    const starts = layout.measureStartSeconds
+    let measureIdx = 0
+    while (measureIdx < starts.length - 2 && starts[measureIdx + 1] <= time) measureIdx++
+    measureIdx = Math.min(measureIdx, xs.length - 2)
+    const measureSeconds = starts[measureIdx + 1] - starts[measureIdx]
+    const withinMeasure = measureSeconds > 0 ? (time - starts[measureIdx]) / measureSeconds : 0
     const measureWidth = xs[measureIdx + 1] - xs[measureIdx]
     const x = xs[measureIdx] + Math.max(0, Math.min(1, withinMeasure)) * measureWidth
 

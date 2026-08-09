@@ -27,6 +27,8 @@ export async function parseMidiFile(file: File): Promise<Song> {
         duration: Math.max(n.duration, 0.05),
         velocity: n.velocity || 0.8,
         hand,
+        ticks: n.ticks,
+        durationTicks: n.durationTicks,
       })
     }
   })
@@ -40,6 +42,8 @@ export async function parseMidiFile(file: File): Promise<Song> {
     ? `${rawKey.key} ${rawKey.scale === 'minor' ? 'Minor' : 'Major'}`
     : undefined
 
+  const [beatsPerBar, beatUnit] = midi.header.timeSignatures[0]?.timeSignature ?? [4, 4]
+
   return {
     id: `upload-${Date.now()}`,
     title: file.name.replace(/\.(mid|midi)$/i, ''),
@@ -47,5 +51,8 @@ export async function parseMidiFile(file: File): Promise<Song> {
     duration: midi.duration,
     bpm,
     keySignature,
+    ppq: midi.header.ppq,
+    tempoEvents: midi.header.tempos.map((t) => ({ ticks: t.ticks, bpm: t.bpm })),
+    timeSignature: [beatsPerBar, beatUnit],
   }
 }

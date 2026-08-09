@@ -22,8 +22,11 @@ function App() {
   const [view, setView] = useState<StageView>('falling')
   const [lookaheadSeconds, setLookaheadSeconds] = useState(3.5)
   const [showMeasureLines, setShowMeasureLines] = useState(true)
+  const [showFingering, setShowFingering] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
-  const { togglePlay, restart, seekBy, setMetronomeEnabled, setLoopStart, setLoopEnd, clearLoop } = engine
+  const { togglePlay, restart, seekBy, setMetronomeEnabled, setLoopStart, setLoopEnd, clearLoop, setFingerForCurrent } =
+    engine
   const metronomeEnabled = engine.metronomeEnabled
 
   const shortcutHandlers = useMemo(
@@ -35,8 +38,20 @@ function App() {
       onSetLoopStart: setLoopStart,
       onSetLoopEnd: setLoopEnd,
       onClearLoop: clearLoop,
+      onToggleFingering: () => setShowFingering((v) => !v),
+      onSetFinger: setFingerForCurrent,
     }),
-    [togglePlay, restart, seekBy, setMetronomeEnabled, metronomeEnabled, setLoopStart, setLoopEnd, clearLoop],
+    [
+      togglePlay,
+      restart,
+      seekBy,
+      setMetronomeEnabled,
+      metronomeEnabled,
+      setLoopStart,
+      setLoopEnd,
+      clearLoop,
+      setFingerForCurrent,
+    ],
   )
   useShortcuts(shortcutHandlers)
 
@@ -52,6 +67,7 @@ function App() {
     requiredNotes: engine.nextRequiredNotes,
     requiredTime: engine.nextRequiredTime,
   }
+  const sheetProps = { ...stageProps, showFingering }
   const fallingProps = {
     ...stageProps,
     isWaitingForInput: engine.isWaitingForInput,
@@ -63,7 +79,20 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>ks-piano</h1>
+        <div className="app-title-row">
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={sidebarOpen ? 'Hide song list' : 'Show song list'}
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen((v) => !v)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <h1>ks-piano</h1>
+        </div>
         <p className="tagline">
           Piano trainer — falling notes, sheet music, or both at once, with a metronome, section looping and
           one-hand practice. Play along on a MIDI keyboard, your computer keys, or the on-screen keys.
@@ -72,9 +101,11 @@ function App() {
       </header>
 
       <div className="app-body">
-        <aside className="sidebar">
-          <SongLibrary currentSongId={engine.song?.id} onSelect={engine.loadSong} />
-        </aside>
+        {sidebarOpen && (
+          <aside className="sidebar">
+            <SongLibrary currentSongId={engine.song?.id} onSelect={engine.loadSong} />
+          </aside>
+        )}
 
         <main className="stage">
           <div className="song-heading">
@@ -97,14 +128,14 @@ function App() {
           {view === 'falling' && <FallingNotes {...fallingProps} />}
           {view === 'sheet' && (
             <Suspense fallback={<div className="sheet-music-loading">Loading sheet music renderer…</div>}>
-              <SheetMusic {...stageProps} />
+              <SheetMusic {...sheetProps} />
             </Suspense>
           )}
           {view === 'both' && (
             <div className="stage-split">
               <div className="stage-split-top">
                 <Suspense fallback={<div className="sheet-music-loading">Loading sheet music renderer…</div>}>
-                  <SheetMusic {...stageProps} />
+                  <SheetMusic {...sheetProps} />
                 </Suspense>
               </div>
               <div className="stage-split-bottom">
@@ -118,6 +149,8 @@ function App() {
             soundingNotes={engine.soundingNotes}
             requiredNotes={engine.nextRequiredNotes}
             soundingHands={engine.soundingHands}
+            fingers={engine.keyFingers}
+            showFingering={showFingering}
             onNoteOn={engine.noteOn}
             onNoteOff={engine.noteOff}
           />
@@ -156,6 +189,8 @@ function App() {
             onLookaheadChange={setLookaheadSeconds}
             showMeasureLines={showMeasureLines}
             onMeasureLinesChange={setShowMeasureLines}
+            showFingering={showFingering}
+            onFingeringChange={setShowFingering}
             inputOctaveShift={engine.inputOctaveShift}
             onInputOctaveShiftChange={engine.setInputOctaveShift}
             hasMidiDevice={engine.midiDevices.length > 0}

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Song } from '../types'
 import { buildKeyboardLayout } from '../piano/layout'
 import { midiToLabel } from '../piano/noteNames'
@@ -39,6 +39,10 @@ export function FallingNotes({
   const layout = useRef(buildKeyboardLayout()).current
   const keyByMidi = useRef(new Map(layout.keys.map((k) => [k.midi, k]))).current
   const dprRef = useRef(1)
+  // Sizing happens in an effect that runs after the first paint, so the draw
+  // pass has to be re-run whenever it changes — otherwise the canvas stays
+  // blank until playback next moves the clock.
+  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -50,8 +54,13 @@ export function FallingNotes({
       if (!canvas || !parent) return
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       dprRef.current = dpr
-      canvas.width = parent.clientWidth * dpr
-      canvas.height = parent.clientHeight * dpr
+      const w = Math.round(parent.clientWidth * dpr)
+      const h = Math.round(parent.clientHeight * dpr)
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+        setCanvasSize({ w, h })
+      }
     }
     resize()
     const ro = new ResizeObserver(resize)
@@ -188,6 +197,7 @@ export function FallingNotes({
     requiredTime,
     lookaheadSeconds,
     showMeasureLines,
+    canvasSize,
     layout,
     keyByMidi,
   ])

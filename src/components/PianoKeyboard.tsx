@@ -9,6 +9,9 @@ interface PianoKeyboardProps {
   requiredNotes: Set<number>
   /** Which hand each currently-sounding note belongs to, for colour coding. */
   soundingHands?: Map<number, Hand>
+  /** Suggested finger (1-5) to play each lit key with. */
+  fingers?: Map<number, number>
+  showFingering?: boolean
   onNoteOn: (midi: number) => void
   onNoteOff: (midi: number) => void
 }
@@ -18,6 +21,8 @@ export function PianoKeyboard({
   soundingNotes,
   requiredNotes,
   soundingHands,
+  fingers,
+  showFingering = false,
   onNoteOn,
   onNoteOff,
 }: PianoKeyboardProps) {
@@ -55,6 +60,7 @@ export function PianoKeyboard({
 
   function renderKey(midi: number, x: number, width: number, black: boolean) {
     const state = keyState(midi)
+    const finger = showFingering ? fingers?.get(midi) : undefined
     const classes = ['key', black ? 'key-black' : 'key-white']
     if (state) classes.push(`key-on key-on-${state}`)
     return (
@@ -62,11 +68,12 @@ export function PianoKeyboard({
         key={midi}
         type="button"
         aria-label={`Key ${midi}`}
+        data-finger={state && finger ? finger : undefined}
         className={classes.join(' ')}
         style={{ left: `${(x / widthUnits) * 100}%`, width: `${(width / widthUnits) * 100}%` }}
         {...bind(midi)}
       >
-        {state && <i className="key-dot" />}
+        {state && <i className={finger ? 'key-dot key-dot-finger' : 'key-dot'}>{finger ?? ''}</i>}
       </button>
     )
   }
