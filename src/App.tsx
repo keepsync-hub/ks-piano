@@ -1,17 +1,21 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaybackEngine } from './hooks/usePlaybackEngine'
 import { useComputerKeyboard } from './hooks/useComputerKeyboard'
 import { useShortcuts } from './hooks/useShortcuts'
 import { useProgress } from './hooks/useProgress'
+import { useProfiles } from './hooks/useProfiles'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useWorkout } from './hooks/useWorkout'
 import { DEMO_SONGS } from './midi/demoSongs'
+import { buildSkillPath } from './piano/skillPath'
 import { SongLibrary } from './components/SongLibrary'
 import { PianoKeyboard } from './components/PianoKeyboard'
 import { FallingNotes } from './components/FallingNotes'
 import { TransportControls } from './components/TransportControls'
 import { PracticeToolbar } from './components/PracticeToolbar'
 import { WorkoutPanel } from './components/WorkoutPanel'
+import { ProgressHUD } from './components/ProgressHUD'
+import { ProfileGate } from './components/ProfileGate'
 import { Legend } from './components/Legend'
 import './App.css'
 
@@ -21,7 +25,11 @@ const SheetMusic = lazy(() => import('./components/SheetMusic').then((m) => ({ d
 type StageView = 'falling' | 'sheet' | 'both'
 
 function App() {
-  const { recordSongResult, recordPractice, stats, getSongProgress } = useProgress()
+  const { profiles, activeProfile, createProfile, selectProfile, clearActiveProfile } = useProfiles()
+  const profileId = activeProfile?.id ?? '__none__'
+  const profileType = activeProfile?.type ?? 'adult'
+
+  const { recordSongResult, recordPractice, stats, getSongProgress, isDueForReview } = useProgress(profileId, profileType)
   const [errorFlash, setErrorFlash] = useState<number | null>(null)
   const workoutCompleteRef = useRef<(() => void) | null>(null)
   const workoutNoteRef = useRef<((correct: boolean) => void) | null>(null)
@@ -42,7 +50,14 @@ function App() {
   })
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
 
-  const workout = useWorkout(DEMO_SONGS, engine.loadSong, engine.setMode)
+  const bestStarsFor = useCallback((songId: string) => getSongProgress(songId)?.bestStars ?? 0, [getSongProgress])
+  const unlockedSongs = useMemo(() => {
+    const tiers = buildSkillPath(DEMO_SONGS, bestStarsFor, profileType)
+    return tiers.filter((t) => t.unlocked).flatMap((t) => t.songs)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileType, stats.totalStars])
+
+  const workout = useWorkout(unlockedSongs.length > 0 ? unlockedSongs : DEMO_SONGS, engine.loadSong, engine.setMode)
   workoutCompleteRef.current = workout.recordSongComplete
   workoutNoteRef.current = workout.recordNote
 
@@ -84,9 +99,13 @@ function App() {
   useShortcuts(shortcutHandlers)
 
   useEffect(() => {
-    engine.loadSong(DEMO_SONGS[1])
+    if (!activeProfile) return
+    // Prefer Twinkle Twinkle as a familiar default, but never load a song this
+    // profile hasn't unlocked yet — fall back to whatever tier 1 offers.
+    const preferred = unlockedSongs.find((s) => s.id === 'demo-twinkle')
+    engine.loadSong(preferred ?? unlockedSongs[0] ?? DEMO_SONGS[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [activeProfile])
 
   const stageProps = {
     song: engine.song,
@@ -104,8 +123,12 @@ function App() {
     showMeasureLines,
   }
 
+  if (!activeProfile) {
+    return <ProfileGate profiles={profiles} onSelect={selectProfile} onCreate={createProfile} />
+  }
+
   return (
-    <div className="app">
+    <div className={activeProfile.type === 'child' ? 'app app-kid-mode' : 'app'}>
       <header className="app-header">
         <div className="app-title-row">
           <button
@@ -120,11 +143,23 @@ function App() {
             <span />
           </button>
           <h1>ks-piano</h1>
-          {stats.streakDays > 0 && (
-            <span className="streak-badge" title={`${stats.streakDays} day practice streak`}>
-              🔥 {stats.streakDays}
-            </span>
-          )}
+          <ProgressHUD
+            level={stats.level}
+            xpIntoLevel={stats.xpIntoLevel}
+            xpForNextLevel={stats.xpForNextLevel}
+            todayXp={stats.todayXp}
+            dailyGoalXp={stats.dailyGoalXp}
+            dailyGoalMet={stats.dailyGoalMet}
+            streakDays={stats.streakDays}
+          />
+          <button
+            type="button"
+            className="profile-switch-btn"
+            title={`Playing as ${activeProfile.name} — switch profile`}
+            onClick={clearActiveProfile}
+          >
+            <span aria-hidden="true">{activeProfile.avatar}</span> {activeProfile.name}
+          </button>
         </div>
         <p className="tagline">
           Piano trainer — falling notes, sheet music, or both at once, with a metronome, section looping and
@@ -136,7 +171,13 @@ function App() {
       <div className="app-body">
         {sidebarOpen && (
           <aside className="sidebar">
-            <SongLibrary currentSongId={engine.song?.id} onSelect={engine.loadSong} />
+            <SongLibrary
+              currentSongId={engine.song?.id}
+              onSelect={engine.loadSong}
+              profileType={activeProfile.type}
+              bestStarsFor={bestStarsFor}
+              isDueForReview={isDueForReview}
+            />
           </aside>
         )}
 

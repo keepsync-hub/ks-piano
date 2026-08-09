@@ -92,4 +92,56 @@ const odeToJoy = buildSong('demo-ode-to-joy', 'Ode to Joy (theme)', 'Beethoven',
   { note: 'G2', beat: 12, beats: 4, hand: 'left' },
 ])
 
-export const DEMO_SONGS: Song[] = [scaleWarmup, twinkle, odeToJoy]
+// Traditional nursery tune (public domain), right hand only — an easy first song.
+const maryHadALittleLamb = buildSong('demo-mary', 'Mary Had a Little Lamb', 'Traditional', 76, [
+  { note: 'E4', beat: 0, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 1, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 2, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 3, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 4, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 5, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 6, beats: 2, hand: 'right' },
+  { note: 'D4', beat: 8, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 9, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 10, beats: 2, hand: 'right' },
+  { note: 'E4', beat: 12, beats: 1, hand: 'right' },
+  { note: 'G4', beat: 13, beats: 1, hand: 'right' },
+  { note: 'G4', beat: 14, beats: 2, hand: 'right' },
+  { note: 'E4', beat: 16, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 17, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 18, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 19, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 20, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 21, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 22, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 23, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 24, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 25, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 26, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 27, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 28, beats: 4, hand: 'right' },
+])
+
+// Original technical exercise: fast two-hand broken chords across a wide
+// range, with real left-hand chords. Sits near the top of the difficulty
+// scale so the skill path has something to unlock into once a player is
+// ready — not a real piece, just a workout for hand independence.
+const arpeggioNotes: { note: string; beat: number; beats: number; hand: Hand }[] = []
+const arpeggioPattern = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'E5', 'C5']
+const bassChords: [string, string][] = [
+  ['C3', 'G3'],
+  ['A2', 'E3'],
+  ['F2', 'C3'],
+  ['G2', 'D3'],
+]
+for (let bar = 0; bar < 4; bar++) {
+  arpeggioPattern.forEach((note, i) => {
+    arpeggioNotes.push({ note, beat: bar * 4 + i * 0.5, beats: 0.5, hand: 'right' })
+  })
+  const [low, high] = bassChords[bar % bassChords.length]
+  arpeggioNotes.push({ note: low, beat: bar * 4, beats: 4, hand: 'left' })
+  arpeggioNotes.push({ note: high, beat: bar * 4, beats: 4, hand: 'left' })
+}
+const arpeggioEtude = buildSong('demo-arpeggio-etude', 'Two-Hand Arpeggio Étude', 'Original exercise', 132, arpeggioNotes)
+
+export const DEMO_SONGS: Song[] = [scaleWarmup, maryHadALittleLamb, twinkle, odeToJoy, arpeggioEtude]

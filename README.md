@@ -4,6 +4,8 @@ A falling-notes piano trainer that runs entirely in the browser.
 
 ## Features
 
+- **Profiles**: separate kid and adult profiles, each with its own streak, XP and song list — a kid profile starts with a smaller, easier slice of the library, an adult profile has the full range from the start
+- **Progress & motivation**, à la Duolingo: XP for practice time and song completions, levels, a configurable daily XP goal that drives the streak, and a skill path that groups songs into difficulty tiers you unlock by mastering the previous one (see `DUOLINGO_ANALYSIS.md` for the full breakdown)
 - 88-key on-screen piano, playable by mouse/touch, a real MIDI keyboard (Web MIDI API), or your computer keyboard (`A`–`;` maps to one octave+ starting at C4)
 - Two ways to follow a song, switchable at any time: a falling-notes visualizer, or a real sheet-music (grand staff) view that auto-scrolls with a playhead, for reading practice
 - **Listen mode**: the song plays itself through a built-in synth

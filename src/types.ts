@@ -40,3 +40,14 @@ export interface Song {
 }
 
 export type PlaybackMode = 'listen' | 'practice'
+
+export type ProfileType = 'child' | 'adult'
+
+export interface Profile {
+  id: string
+  name: string
+  type: ProfileType
+  /** A single emoji used as the profile's avatar. */
+  avatar: string
+  createdAt: number
+}

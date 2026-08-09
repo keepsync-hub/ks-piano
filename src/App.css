@@ -34,6 +34,47 @@
   box-shadow: 0 2px 8px rgba(255, 107, 53, 0.35);
 }
 
+.profile-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #1c2029;
+  border: 1px solid #2c3140;
+  color: #cfd3de;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.profile-switch-btn:hover {
+  background: #262c38;
+}
+
+/* Kid profile: bigger touch targets and a warmer accent throughout. */
+.app-kid-mode .app-header {
+  border-bottom-color: #3a2a1a;
+}
+
+.app-kid-mode h1 {
+  color: #ffb84d;
+}
+
+.app-kid-mode .song-row {
+  padding: 12px 12px;
+}
+
+.app-kid-mode .song-title {
+  font-size: 15px;
+}
+
+.app-kid-mode .view-btn,
+.app-kid-mode .mode-btn,
+.app-kid-mode .icon-btn {
+  font-size: 14px;
+}
+
 .sidebar-toggle {
   display: flex;
   flex-direction: column;
