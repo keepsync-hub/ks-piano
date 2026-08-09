@@ -3,7 +3,7 @@
   flex: 1;
   min-height: 0;
   width: 100%;
-  background: #12141a;
+  background: #f7f7f5;
   display: flex;
   flex-direction: column;
 }
@@ -26,26 +26,26 @@
   display: block;
 }
 
+/* Engraved notation is black-on-paper; the highlight layer keeps its own fills. */
 .sheet-music-host :is(text, path, line, rect):not(.sheet-highlights *) {
-  fill: #e6e8ee;
-  stroke: #e6e8ee;
+  fill: #14161b;
+  stroke: #14161b;
 }
 
 .sheet-music-playhead {
   position: absolute;
-  top: 8px;
-  bottom: 8px;
+  top: 4px;
+  bottom: 4px;
   left: 0;
   width: 2px;
-  background: #ffb84d;
-  box-shadow: 0 0 6px rgba(255, 184, 77, 0.7);
+  background: #d94a4a;
   pointer-events: none;
 }
 
 .sheet-music-empty {
   margin: 0;
   padding: 24px;
-  color: #8a90a2;
+  color: #6b7280;
   font-size: 13px;
   text-align: center;
 }

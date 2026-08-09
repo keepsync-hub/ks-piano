@@ -19,6 +19,8 @@ export interface Song {
   duration: number
   /** Beats per minute, used to lay out sheet music notation. */
   bpm: number
+  /** Display label such as "G Major"; shown on the falling-notes stage. */
+  keySignature?: string
 }
 
 export type PlaybackMode = 'listen' | 'practice'

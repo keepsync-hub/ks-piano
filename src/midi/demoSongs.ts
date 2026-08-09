@@ -19,7 +19,7 @@ function buildSong(id: string, title: string, composer: string, bpm: number, bea
   }))
   notes.sort((a, b) => a.time - b.time)
   const duration = Math.max(...notes.map((n) => n.time + n.duration)) + 1
-  return { id, title, composer, notes, duration, bpm }
+  return { id, title, composer, notes, duration, bpm, keySignature: 'C Major' }
 }
 
 // Simple right-hand-only warm-up exercise.

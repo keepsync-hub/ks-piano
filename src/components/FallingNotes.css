@@ -12,3 +12,45 @@
   height: 100%;
   display: block;
 }
+
+.stage-measure,
+.stage-key {
+  position: absolute;
+  left: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.stage-measure {
+  top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-key {
+  bottom: 12px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.stage-stats {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  gap: 18px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #d8dbe2;
+  font-size: 13px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.stage-stats b {
+  color: #8bc34a;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

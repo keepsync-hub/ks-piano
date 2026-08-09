@@ -10,7 +10,12 @@ interface SheetMusicProps {
   time: number
   heldNotes: Set<number>
   requiredNotes: Set<number>
+  /** Score time of the required group, so only that occurrence is highlighted. */
+  requiredTime?: number | null
 }
+
+/** How far from the playhead a note still counts as "the one being played now". */
+const NEAR_PLAYHEAD_SECONDS = 0.4
 
 const MEASURE_MIN_WIDTH = 140
 const WIDTH_PER_ELEMENT = 32
@@ -18,7 +23,15 @@ const LEFT_MARGIN = 24
 const RIGHT_PADDING = 30
 const MIN_STAVE_HEIGHT = 150
 const MAX_STAVE_HEIGHT = 320
-const HAND_FILL = { right: '#3fb6ff', left: '#ff5fa8' }
+// Tuned for the light "paper" background: saturated enough to read over black engraving.
+const MEASURE_TINT = 'rgba(74, 144, 217, 0.16)'
+const NOW_PLAYING_TINT = 'rgba(74, 144, 217, 0.45)'
+const NOTE_TINTS = {
+  input: 'rgba(255, 95, 168, 0.45)',
+  required: 'rgba(255, 152, 0, 0.5)',
+  left: 'rgba(74, 144, 217, 0.45)',
+  right: 'rgba(139, 195, 74, 0.5)',
+}
 
 interface HighlightEntry {
   rect: SVGRectElement
@@ -36,7 +49,7 @@ function buildVexNote(el: ScoreElement, clef: 'treble' | 'bass'): StaveNote {
   return note
 }
 
-export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicProps) {
+export function SheetMusic({ song, time, heldNotes, requiredNotes, requiredTime }: SheetMusicProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const playheadRef = useRef<HTMLDivElement>(null)
@@ -190,7 +203,7 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
     if (measureRect) {
       measureRect.setAttribute('x', String(xs[measureIdx]))
       measureRect.setAttribute('width', String(measureWidth))
-      measureRect.style.fill = 'rgba(63, 182, 255, 0.09)'
+      measureRect.style.fill = MEASURE_TINT
     }
 
     let playingMinX = Infinity
@@ -198,12 +211,19 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
 
     for (const { rect, refs } of highlightsRef.current) {
       let fill = 'transparent'
-      const anyRequired = refs.some((r) => requiredNotes.has(r.midi))
-      const anyHeld = refs.some((r) => heldNotes.has(r.midi))
+      // Scoped by score time, otherwise every other occurrence of the same
+      // pitch elsewhere in the piece would light up too.
       const anySounding = refs.some((r) => time >= r.time && time < r.time + r.duration)
-      if (anyHeld) fill = 'rgba(79, 194, 127, 0.5)'
-      else if (anyRequired) fill = 'rgba(255, 184, 77, 0.55)'
-      else if (anySounding) fill = `${HAND_FILL[refs[0].hand]}55`
+      const anyRequired =
+        requiredTime != null && refs.some((r) => requiredNotes.has(r.midi) && Math.abs(r.time - requiredTime) < 0.05)
+      const anyHeld = refs.some(
+        (r) =>
+          heldNotes.has(r.midi) &&
+          (Math.abs(r.time - time) < NEAR_PLAYHEAD_SECONDS || (time >= r.time && time < r.time + r.duration)),
+      )
+      if (anyHeld) fill = NOTE_TINTS.input
+      else if (anyRequired) fill = NOTE_TINTS.required
+      else if (anySounding) fill = NOTE_TINTS[refs[0].hand]
       rect.style.fill = fill
 
       if (anyHeld || anySounding) {
@@ -219,12 +239,12 @@ export function SheetMusic({ song, time, heldNotes, requiredNotes }: SheetMusicP
       if (playingMaxX > playingMinX) {
         nowPlayingRect.setAttribute('x', String(playingMinX - 3))
         nowPlayingRect.setAttribute('width', String(playingMaxX - playingMinX + 6))
-        nowPlayingRect.style.fill = 'rgba(63, 182, 255, 0.32)'
+        nowPlayingRect.style.fill = NOW_PLAYING_TINT
       } else {
         nowPlayingRect.style.fill = 'transparent'
       }
     }
-  }, [time, heldNotes, requiredNotes])
+  }, [time, heldNotes, requiredNotes, requiredTime])
 
   return (
     <div className="sheet-music-wrap">

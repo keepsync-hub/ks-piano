@@ -1,5 +1,6 @@
 .legend {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 8px 16px;
   font-size: 12px;
@@ -20,14 +21,18 @@
   display: inline-block;
 }
 
-.legend-swatch-right {
-  background: linear-gradient(#a6e2ff, #3fb6ff);
-}
-
 .legend-swatch-left {
-  background: linear-gradient(#ffc0dd, #ff5fa8);
+  background: linear-gradient(#7fb6ea, #2f6fb5);
 }
 
-.legend-swatch-held {
-  background: linear-gradient(#8fe0b0, #4fc27f);
+.legend-swatch-right {
+  background: linear-gradient(#b0dd7a, #649a2c);
+}
+
+.legend-swatch-input {
+  background: linear-gradient(#ffa3cd, #c93b7c);
+}
+
+.legend-swatch-required {
+  background: linear-gradient(#ffd695, #c98a24);
 }

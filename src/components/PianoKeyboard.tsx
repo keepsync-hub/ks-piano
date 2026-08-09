@@ -1,25 +1,34 @@
 import { useMemo } from 'react'
 import { buildKeyboardLayout } from '../piano/layout'
+import type { Hand } from '../types'
 import './PianoKeyboard.css'
 
 interface PianoKeyboardProps {
   heldNotes: Set<number>
   soundingNotes: Set<number>
   requiredNotes: Set<number>
+  /** Which hand each currently-sounding note belongs to, for colour coding. */
+  soundingHands?: Map<number, Hand>
   onNoteOn: (midi: number) => void
   onNoteOff: (midi: number) => void
 }
 
-export function PianoKeyboard({ heldNotes, soundingNotes, requiredNotes, onNoteOn, onNoteOff }: PianoKeyboardProps) {
+export function PianoKeyboard({
+  heldNotes,
+  soundingNotes,
+  requiredNotes,
+  soundingHands,
+  onNoteOn,
+  onNoteOff,
+}: PianoKeyboardProps) {
   const layout = useMemo(() => buildKeyboardLayout(), [])
   const widthUnits = layout.whiteKeyCount
 
-  function keyClass(midi: number, black: boolean): string {
-    const classes = ['key', black ? 'key-black' : 'key-white']
-    if (heldNotes.has(midi)) classes.push('key-held')
-    else if (requiredNotes.has(midi)) classes.push('key-required')
-    else if (soundingNotes.has(midi)) classes.push('key-sounding')
-    return classes.join(' ')
+  function keyState(midi: number): string | null {
+    if (heldNotes.has(midi)) return 'input'
+    if (requiredNotes.has(midi)) return 'required'
+    if (soundingNotes.has(midi)) return soundingHands?.get(midi) === 'left' ? 'left' : 'right'
+    return null
   }
 
   function bind(midi: number) {
@@ -44,29 +53,29 @@ export function PianoKeyboard({ heldNotes, soundingNotes, requiredNotes, onNoteO
   const whiteKeys = layout.keys.filter((k) => !k.black)
   const blackKeys = layout.keys.filter((k) => k.black)
 
+  function renderKey(midi: number, x: number, width: number, black: boolean) {
+    const state = keyState(midi)
+    const classes = ['key', black ? 'key-black' : 'key-white']
+    if (state) classes.push(`key-on key-on-${state}`)
+    return (
+      <button
+        key={midi}
+        type="button"
+        aria-label={`Key ${midi}`}
+        className={classes.join(' ')}
+        style={{ left: `${(x / widthUnits) * 100}%`, width: `${(width / widthUnits) * 100}%` }}
+        {...bind(midi)}
+      >
+        {state && <i className="key-dot" />}
+      </button>
+    )
+  }
+
   return (
-    <div className="piano-keyboard" style={{ ['--white-count' as string]: widthUnits }}>
+    <div className="piano-keyboard">
       <div className="keys-layer">
-        {whiteKeys.map((k) => (
-          <button
-            key={k.midi}
-            type="button"
-            aria-label={`Key ${k.midi}`}
-            className={keyClass(k.midi, false)}
-            style={{ left: `${(k.x / widthUnits) * 100}%`, width: `${(k.width / widthUnits) * 100}%` }}
-            {...bind(k.midi)}
-          />
-        ))}
-        {blackKeys.map((k) => (
-          <button
-            key={k.midi}
-            type="button"
-            aria-label={`Key ${k.midi}`}
-            className={keyClass(k.midi, true)}
-            style={{ left: `${(k.x / widthUnits) * 100}%`, width: `${(k.width / widthUnits) * 100}%` }}
-            {...bind(k.midi)}
-          />
-        ))}
+        {whiteKeys.map((k) => renderKey(k.midi, k.x, k.width, false))}
+        {blackKeys.map((k) => renderKey(k.midi, k.x, k.width, true))}
       </div>
     </div>
   )

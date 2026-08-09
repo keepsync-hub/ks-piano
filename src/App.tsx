@@ -69,7 +69,15 @@ function App() {
             </div>
           </div>
           {view === 'falling' && (
-            <FallingNotes song={engine.song} time={engine.time} isWaitingForInput={engine.isWaitingForInput} />
+            <FallingNotes
+              song={engine.song}
+              time={engine.time}
+              isWaitingForInput={engine.isWaitingForInput}
+              heldNotes={engine.heldNotes}
+              requiredNotes={engine.nextRequiredNotes}
+              requiredTime={engine.nextRequiredTime}
+              stats={engine.stats}
+            />
           )}
           {view === 'sheet' && (
             <Suspense fallback={<div className="sheet-music-loading">Loading sheet music renderer…</div>}>
@@ -78,6 +86,7 @@ function App() {
                 time={engine.time}
                 heldNotes={engine.heldNotes}
                 requiredNotes={engine.nextRequiredNotes}
+                requiredTime={engine.nextRequiredTime}
               />
             </Suspense>
           )}
@@ -90,11 +99,20 @@ function App() {
                     time={engine.time}
                     heldNotes={engine.heldNotes}
                     requiredNotes={engine.nextRequiredNotes}
+                    requiredTime={engine.nextRequiredTime}
                   />
                 </Suspense>
               </div>
               <div className="stage-split-bottom">
-                <FallingNotes song={engine.song} time={engine.time} isWaitingForInput={engine.isWaitingForInput} />
+                <FallingNotes
+                  song={engine.song}
+                  time={engine.time}
+                  isWaitingForInput={engine.isWaitingForInput}
+                  heldNotes={engine.heldNotes}
+                  requiredNotes={engine.nextRequiredNotes}
+                  requiredTime={engine.nextRequiredTime}
+                  stats={engine.stats}
+                />
               </div>
             </div>
           )}
@@ -102,6 +120,7 @@ function App() {
             heldNotes={engine.heldNotes}
             soundingNotes={engine.soundingNotes}
             requiredNotes={engine.nextRequiredNotes}
+            soundingHands={engine.soundingHands}
             onNoteOn={engine.noteOn}
             onNoteOff={engine.noteOff}
           />

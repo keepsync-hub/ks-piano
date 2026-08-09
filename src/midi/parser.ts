@@ -35,11 +35,17 @@ export async function parseMidiFile(file: File): Promise<Song> {
 
   const bpm = midi.header.tempos[0]?.bpm ?? 120
 
+  const rawKey = midi.header.keySignatures[0]
+  const keySignature = rawKey
+    ? `${rawKey.key} ${rawKey.scale === 'minor' ? 'Minor' : 'Major'}`
+    : undefined
+
   return {
     id: `upload-${Date.now()}`,
     title: file.name.replace(/\.(mid|midi)$/i, ''),
     notes,
     duration: midi.duration,
     bpm,
+    keySignature,
   }
 }

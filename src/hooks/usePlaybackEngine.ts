@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { NoteEvent, PlaybackMode, Song } from '../types'
+import type { Hand, NoteEvent, PlaybackMode, Song } from '../types'
 import { ensureAudioStarted, playNote, releaseNote } from '../audio/synth'
 import { connectMidiInputs } from '../audio/midiInput'
 
@@ -34,8 +34,11 @@ export function usePlaybackEngine() {
   const [time, setTime] = useState(0)
   const [heldNotes, setHeldNotes] = useState<Set<number>>(new Set())
   const [soundingNotes, setSoundingNotes] = useState<Set<number>>(new Set())
+  const [soundingHands, setSoundingHands] = useState<Map<number, Hand>>(new Map())
   const [clearedGroupIndex, setClearedGroupIndex] = useState(-1)
   const [midiDevices, setMidiDevices] = useState<string[]>([])
+  const [notesPlayed, setNotesPlayed] = useState(0)
+  const [errors, setErrors] = useState(0)
 
   const songRef = useRef<Song | null>(null)
   const modeRef = useRef<PlaybackMode>('listen')
@@ -45,7 +48,10 @@ export function usePlaybackEngine() {
   const groupsRef = useRef<NoteGroup[]>([])
   const clearedGroupIndexRef = useRef(-1)
   const notesCursorRef = useRef(0)
-  const soundingMapRef = useRef<Map<number, number>>(new Map())
+  const notesPassedRef = useRef(0)
+  const errorsRef = useRef(0)
+  const requiredNotesRef = useRef<Set<number>>(new Set())
+  const soundingMapRef = useRef<Map<number, { endTime: number; hand: Hand }>>(new Map())
   const clockRef = useRef<{ baseTime: number; startedAt: number | null }>({ baseTime: 0, startedAt: null })
 
   const computeTime = useCallback((): number => {
@@ -72,6 +78,8 @@ export function usePlaybackEngine() {
     let cursor = 0
     while (cursor < notes.length && notes[cursor].time <= t) cursor++
     notesCursorRef.current = cursor
+    notesPassedRef.current = cursor
+    setNotesPlayed(cursor)
 
     const groups = groupsRef.current
     let idx = -1
@@ -84,6 +92,7 @@ export function usePlaybackEngine() {
 
     soundingMapRef.current.clear()
     setSoundingNotes(new Set())
+    setSoundingHands(new Map())
   }, [])
 
   const loadSong = useCallback(
@@ -94,12 +103,14 @@ export function usePlaybackEngine() {
       playingRef.current = false
       heldNotesRef.current = new Set()
       notesCursorRef.current = 0
+      errorsRef.current = 0
       soundingMapRef.current.clear()
       setSongState(newSong)
       setTime(0)
       setPlaying(false)
       setHeldNotes(new Set())
       setSoundingNotes(new Set())
+      setErrors(0)
       recalcCursorsFor(0)
     },
     [recalcCursorsFor],
@@ -160,6 +171,13 @@ export function usePlaybackEngine() {
     if (!heldNotesRef.current.has(midi)) {
       heldNotesRef.current.add(midi)
       setHeldNotes(new Set(heldNotesRef.current))
+
+      // In practice mode, a key that isn't part of the note we're waiting on is a miss.
+      const required = requiredNotesRef.current
+      if (modeRef.current === 'practice' && required.size > 0 && !required.has(midi)) {
+        errorsRef.current += 1
+        setErrors(errorsRef.current)
+      }
     }
     playNote(midi, velocity)
   }, [])
@@ -223,18 +241,32 @@ export function usePlaybackEngine() {
         while (cursor < notes.length && notes[cursor].time <= t) {
           const n = notes[cursor]
           playNote(n.midi, n.velocity, n.duration)
-          soundingMapRef.current.set(n.midi, n.time + n.duration)
+          soundingMapRef.current.set(n.midi, { endTime: n.time + n.duration, hand: n.hand })
           dirty = true
           cursor++
         }
         notesCursorRef.current = cursor
-        for (const [midi, endTime] of soundingMapRef.current) {
-          if (endTime <= t) {
+        for (const [midi, info] of soundingMapRef.current) {
+          if (info.endTime <= t) {
             soundingMapRef.current.delete(midi)
             dirty = true
           }
         }
-        if (dirty) setSoundingNotes(new Set(soundingMapRef.current.keys()))
+        if (dirty) {
+          setSoundingNotes(new Set(soundingMapRef.current.keys()))
+          setSoundingHands(new Map([...soundingMapRef.current].map(([midi, info]) => [midi, info.hand])))
+        }
+      }
+
+      // Progress counter advances with the playhead in both modes.
+      if (song) {
+        const notes = song.notes
+        let passed = notesPassedRef.current
+        while (passed < notes.length && notes[passed].time <= t) passed++
+        if (passed !== notesPassedRef.current) {
+          notesPassedRef.current = passed
+          setNotesPlayed(passed)
+        }
       }
 
       if (song && playingRef.current && t >= song.duration) {
@@ -259,6 +291,14 @@ export function usePlaybackEngine() {
     return new Set(group.notes.map((n) => n.midi))
   }, [mode, clearedGroupIndex, groups])
 
+  /** Score time of the group practice mode is waiting on, so highlights can be scoped to it. */
+  const nextRequiredTime = useMemo((): number | null => {
+    if (mode !== 'practice') return null
+    return groups[clearedGroupIndex + 1]?.time ?? null
+  }, [mode, clearedGroupIndex, groups])
+
+  requiredNotesRef.current = nextRequiredNotes
+
   const isWaitingForInput = mode === 'practice' && !playing && nextRequiredNotes.size > 0
 
   return {
@@ -277,11 +317,14 @@ export function usePlaybackEngine() {
     time,
     heldNotes,
     soundingNotes,
+    soundingHands,
     noteOn,
     noteOff,
     midiDevices,
     nextRequiredNotes,
+    nextRequiredTime,
     isWaitingForInput,
+    stats: { notesPlayed, totalNotes: song?.notes.length ?? 0, errors },
     progress: song && song.duration > 0 ? time / song.duration : 0,
   }
 }

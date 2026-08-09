@@ -1,21 +1,35 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { Song } from '../types'
 import { buildKeyboardLayout } from '../piano/layout'
+import { midiToLabel } from '../piano/noteNames'
+import { HAND_COLORS, HIT_LINE, INPUT_COLOR, OCTAVE_LINE, REQUIRED_COLOR, STAGE_BG } from '../piano/theme'
 import './FallingNotes.css'
 
 interface FallingNotesProps {
   song: Song | null
   time: number
   isWaitingForInput: boolean
+  heldNotes: Set<number>
+  requiredNotes: Set<number>
+  /** Score time of the required group, so only that occurrence is highlighted. */
+  requiredTime?: number | null
+  stats?: { notesPlayed: number; totalNotes: number; errors: number }
 }
 
 const LOOKAHEAD_SECONDS = 3.5
-const HAND_COLOR = {
-  right: { fill: '#3fb6ff', edge: '#a6e2ff' },
-  left: { fill: '#ff5fa8', edge: '#ffc0dd' },
-}
+const LABEL_MIN_HEIGHT = 26
+const LABEL_MIN_WIDTH = 15
+const BEATS_PER_MEASURE = 4
 
-export function FallingNotes({ song, time, isWaitingForInput }: FallingNotesProps) {
+export function FallingNotes({
+  song,
+  time,
+  isWaitingForInput,
+  heldNotes,
+  requiredNotes,
+  requiredTime,
+  stats,
+}: FallingNotesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const layout = useRef(buildKeyboardLayout()).current
   const keyByMidi = useRef(new Map(layout.keys.map((k) => [k.midi, k]))).current
@@ -48,22 +62,27 @@ export function FallingNotes({ song, time, isWaitingForInput }: FallingNotesProp
 
     const w = canvas.width
     const h = canvas.height
-    ctx.clearRect(0, 0, w, h)
+    const dpr = dprRef.current
+    const whiteCount = layout.whiteKeyCount
 
-    // subtle background lane grid
-    ctx.fillStyle = '#12141a'
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = STAGE_BG
     ctx.fillRect(0, 0, w, h)
 
-    const whiteCount = layout.whiteKeyCount
+    // Octave separators, drawn at every C so the register is readable at a glance.
+    ctx.strokeStyle = OCTAVE_LINE
+    ctx.lineWidth = Math.max(1, dpr)
     for (const key of layout.keys) {
-      if (key.black) continue
-      const x = (key.x / whiteCount) * w
-      const width = (key.width / whiteCount) * w
-      ctx.fillStyle = key.midi % 12 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.012)'
-      ctx.fillRect(x, 0, width, h)
+      if (key.black || key.midi % 12 !== 0) continue
+      const x = Math.round((key.x / whiteCount) * w) + 0.5
+      ctx.beginPath()
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, h)
+      ctx.stroke()
     }
 
     if (song) {
+      const labelFont = `600 ${Math.round(12 * dpr)}px -apple-system, "Segoe UI", Roboto, sans-serif`
       for (const note of song.notes) {
         const noteEnd = note.time + note.duration
         if (noteEnd < time - 0.1 || note.time > time + LOOKAHEAD_SECONDS) continue
@@ -71,41 +90,93 @@ export function FallingNotes({ song, time, isWaitingForInput }: FallingNotesProp
         const key = keyByMidi.get(note.midi)
         if (!key) continue
 
-        const x = (key.x / whiteCount) * w + w * 0.001
-        const width = (key.width / whiteCount) * w - w * 0.002
+        const gap = Math.max(1.5 * dpr, w * 0.0012)
+        const x = (key.x / whiteCount) * w + gap
+        const width = (key.width / whiteCount) * w - gap * 2
 
         const yBottom = h * (1 - (note.time - time) / LOOKAHEAD_SECONDS)
         const yTop = h * (1 - (noteEnd - time) / LOOKAHEAD_SECONDS)
         const barTop = Math.max(0, Math.min(yTop, yBottom))
-        const barHeight = Math.max(4, Math.abs(yBottom - yTop))
+        const barHeight = Math.max(5 * dpr, Math.abs(yBottom - yTop))
 
-        const colors = HAND_COLOR[note.hand]
-        const isPast = note.time < time
-        ctx.globalAlpha = isPast ? 0.35 : 1
-        const grad = ctx.createLinearGradient(0, barTop, 0, barTop + barHeight)
-        grad.addColorStop(0, colors.edge)
-        grad.addColorStop(1, colors.fill)
+        let palette = HAND_COLORS[note.hand]
+        if (heldNotes.has(note.midi) && time >= note.time - 0.15 && time < noteEnd) palette = INPUT_COLOR
+        else if (
+          requiredTime != null &&
+          requiredNotes.has(note.midi) &&
+          Math.abs(note.time - requiredTime) < 0.05
+        ) {
+          palette = REQUIRED_COLOR
+        }
+
+        const isPast = noteEnd < time
+        ctx.globalAlpha = isPast ? 0.3 : 1
+
+        const radius = Math.min(5 * dpr, width / 2, barHeight / 2)
+        const grad = ctx.createLinearGradient(x, 0, x + width, 0)
+        grad.addColorStop(0, palette.light)
+        grad.addColorStop(0.45, palette.base)
+        grad.addColorStop(1, palette.dark)
         ctx.fillStyle = grad
-        const r = Math.min(6 * dprRef.current, width / 2, barHeight / 2)
-        roundRect(ctx, x, barTop, width, barHeight, r)
+        roundRect(ctx, x, barTop, width, barHeight, radius)
         ctx.fill()
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
+        ctx.lineWidth = Math.max(1, dpr * 0.8)
+        roundRect(ctx, x, barTop, width, barHeight, radius)
+        ctx.stroke()
+
+        // Label sits inside the on-screen part of the block, so notes that have
+        // already scrolled past the hit line don't leave a floating label behind.
+        const visibleTop = Math.max(0, barTop)
+        const visibleBottom = Math.min(h, barTop + barHeight)
+        const visibleHeight = visibleBottom - visibleTop
+        if (visibleHeight > LABEL_MIN_HEIGHT * dpr && width > LABEL_MIN_WIDTH * dpr) {
+          ctx.font = labelFont
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'alphabetic'
+          ctx.fillStyle = '#ffffff'
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.55)'
+          ctx.shadowBlur = 2 * dpr
+          ctx.fillText(midiToLabel(note.midi), x + width / 2, visibleBottom - 7 * dpr)
+          ctx.shadowBlur = 0
+        }
+
         ctx.globalAlpha = 1
       }
     }
 
-    // hit line
-    const hitY = h - 2
-    ctx.strokeStyle = isWaitingForInput ? '#ffb84d' : 'rgba(255,255,255,0.25)'
-    ctx.lineWidth = isWaitingForInput ? 3 * dprRef.current : 1.5 * dprRef.current
+    // Hit line the notes land on.
+    const hitY = h - Math.max(1, dpr * 1.5)
+    ctx.strokeStyle = isWaitingForInput ? REQUIRED_COLOR.base : HIT_LINE
+    ctx.lineWidth = (isWaitingForInput ? 3 : 2) * dpr
     ctx.beginPath()
     ctx.moveTo(0, hitY)
     ctx.lineTo(w, hitY)
     ctx.stroke()
-  }, [song, time, isWaitingForInput, layout, keyByMidi])
+  }, [song, time, isWaitingForInput, heldNotes, requiredNotes, requiredTime, layout, keyByMidi])
+
+  const measureNumber = useMemo(() => {
+    if (!song) return null
+    const secondsPerMeasure = (60 / song.bpm) * BEATS_PER_MEASURE
+    return Math.floor(time / secondsPerMeasure) + 1
+  }, [song, time])
 
   return (
     <div className="falling-notes-wrap">
       <canvas ref={canvasRef} className="falling-notes-canvas" />
+      {measureNumber !== null && <span className="stage-measure">{measureNumber}</span>}
+      {song?.keySignature && <span className="stage-key">{song.keySignature}</span>}
+      {stats && (
+        <div className="stage-stats">
+          <span>
+            Notes: <b>{stats.notesPlayed} / {stats.totalNotes}</b>
+          </span>
+          <span>
+            Errors: <b>{stats.errors}</b>
+          </span>
+        </div>
+      )}
     </div>
   )
 }
