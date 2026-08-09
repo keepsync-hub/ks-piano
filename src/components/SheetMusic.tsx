@@ -66,9 +66,8 @@ function buildVexNote(el: ScoreElement, clef: 'treble' | 'bass', showFingering: 
   }
   const note = new StaveNote({ keys: el.keys, duration: el.vfDuration, clef })
   if (el.dots) Dot.buildAndAttach([note], { all: true })
-  el.accidentals.forEach((acc, i) => {
-    if (acc) note.addModifier(new Accidental(acc), i)
-  })
+  // Accidentals aren't attached here — Accidental.applyAccidentals() decides
+  // per-note, per-measure, against the key signature (see the build effect).
   if (showFingering) {
     // Convention: right-hand fingering above the treble staff, left-hand below the bass.
     const position = clef === 'treble' ? Modifier.Position.ABOVE : Modifier.Position.BELOW
@@ -172,8 +171,12 @@ export function SheetMusic({ song, time, showFingering = false }: SheetMusicProp
         const clefContext = clefRenderer.getContext()
         const clefTreble = new Stave(0, trebleY, CLEF_PANEL_RENDER_WIDTH)
         const clefBass = new Stave(0, bassY, CLEF_PANEL_RENDER_WIDTH)
-        clefTreble.addClef('treble').addTimeSignature(timeSpec).setEndBarType(Barline.type.NONE)
-        clefBass.addClef('bass').addTimeSignature(timeSpec).setEndBarType(Barline.type.NONE)
+        clefTreble
+          .addClef('treble')
+          .addKeySignature(score.keySpec)
+          .addTimeSignature(timeSpec)
+          .setEndBarType(Barline.type.NONE)
+        clefBass.addClef('bass').addKeySignature(score.keySpec).addTimeSignature(timeSpec).setEndBarType(Barline.type.NONE)
         clefTreble.setContext(clefContext).draw()
         clefBass.setContext(clefContext).draw()
         new StaveConnector(clefTreble, clefBass).setType('brace').setContext(clefContext).draw()
@@ -198,6 +201,13 @@ export function SheetMusic({ song, time, showFingering = false }: SheetMusicProp
         }
         const trebleVoice = trebleNotes.length ? makeVoice(trebleNotes) : null
         const bassVoice = bassNotes.length ? makeVoice(bassNotes) : null
+        // Resolves accidentals against the key signature — before any width
+        // measurement, since a sharp/flat/natural changes how much room a
+        // note needs. Applied per hand so treble and bass never share
+        // carry-over, and per measure (fresh voices each time) so it resets
+        // at the barline like real notation.
+        if (trebleVoice) Accidental.applyAccidentals([trebleVoice], score.keySpec)
+        if (bassVoice) Accidental.applyAccidentals([bassVoice], score.keySpec)
         if (trebleVoice) voices.push(trebleVoice)
         if (bassVoice) voices.push(bassVoice)
 

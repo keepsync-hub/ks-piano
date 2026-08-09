@@ -16,7 +16,6 @@ export interface ScoreNoteElement {
   vfDuration: string
   dots: number
   keys: string[]
-  accidentals: (string | null)[]
   refs: NoteEvent[]
   /** True when this element continues a note split across a barline. */
   tiedFromPrevious: boolean
@@ -41,6 +40,22 @@ export interface ScoreLayout {
   measureStartSeconds: number[]
   unitsPerMeasure: number
   timeSignature: [number, number]
+  /** A VexFlow key-signature spec, e.g. "C", "F#", "Bb" — see keySignatureToVexSpec. */
+  keySpec: string
+}
+
+/**
+ * The 15 key names VexFlow's key-signature table understands, always in
+ * their major spelling — a minor key shares its relative major's sharps and
+ * flats, so the major spelling draws the correct signature either way (and
+ * this sidesteps needing to also carry the mode through).
+ */
+const VALID_KEY_LETTERS = new Set(['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'])
+
+/** Turns a display string like "B Major" or "F# Minor" into a VexFlow key spec, e.g. "B", "F#". */
+export function keySignatureToVexSpec(keySignature: string | undefined): string {
+  const letter = keySignature?.split(' ')[0]
+  return letter && VALID_KEY_LETTERS.has(letter) ? letter : 'C'
 }
 
 /**
@@ -65,11 +80,10 @@ function makeTicksToSeconds(ppq: number, tempos: TempoEvent[]) {
 
 const NOTE_NAMES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b']
 
-function midiToVexKey(midi: number): { key: string; accidental: string | null } {
+function midiToVexKey(midi: number): string {
   const pitchClass = ((midi % 12) + 12) % 12
   const octave = Math.floor(midi / 12) - 1
-  const name = NOTE_NAMES[pitchClass]
-  return { key: `${name}/${octave}`, accidental: name.includes('#') ? '#' : null }
+  return `${NOTE_NAMES[pitchClass]}/${octave}`
 }
 
 interface DurationValue {
@@ -200,9 +214,7 @@ function layoutHandMeasures(
         continue
       }
 
-      const parsed = event.refs.map((r) => midiToVexKey(r.midi))
-      const keys = parsed.map((p) => p.key)
-      const accidentals = parsed.map((p) => p.accidental)
+      const keys = event.refs.map((r) => midiToVexKey(r.midi))
       // A note carried in from the previous measure is tied, not restruck.
       let tiedFromPrevious = cursor > event.startUnit
       for (const v of decompose(len)) {
@@ -211,7 +223,6 @@ function layoutHandMeasures(
           vfDuration: v.duration,
           dots: v.dots,
           keys,
-          accidentals,
           refs: event.refs,
           tiedFromPrevious,
         })
@@ -279,5 +290,11 @@ export function buildScore(song: Song): ScoreLayout {
     )
   }
 
-  return { measures, measureStartSeconds, unitsPerMeasure, timeSignature: [beatsPerBar, beatUnit] }
+  return {
+    measures,
+    measureStartSeconds,
+    unitsPerMeasure,
+    timeSignature: [beatsPerBar, beatUnit],
+    keySpec: keySignatureToVexSpec(song.keySignature),
+  }
 }
