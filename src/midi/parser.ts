@@ -10,8 +10,17 @@ import { HIGHEST_MIDI, LOWEST_MIDI } from '../piano/layout'
  * splitting by pitch around middle C.
  */
 export async function parseMidiFile(file: File): Promise<Song> {
+  if (!file.name.match(/\.(mid|midi)$/i)) {
+    throw new Error('Only .mid and .midi files are supported')
+  }
+
   const buffer = await file.arrayBuffer()
-  const midi = new Midi(buffer)
+  let midi: Midi
+  try {
+    midi = new Midi(buffer)
+  } catch {
+    throw new Error('Could not parse MIDI file: the file may be corrupted or invalid')
+  }
 
   const tracksWithNotes = midi.tracks.filter((t) => t.notes.length > 0)
   const useTrackHeuristic = tracksWithNotes.length >= 2

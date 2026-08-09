@@ -17,12 +17,11 @@ export interface LoopRegion {
 }
 
 const GROUP_EPSILON = 0.05
-const BEATS_PER_MEASURE = 4
 const COUNT_IN_BEATS = 4
 /** Shorter A–B regions are treated as unset rather than looping every frame. */
 const MIN_LOOP_SECONDS = 0.25
 
-function buildGroups(notes: NoteEvent[]): NoteGroup[] {
+export function buildGroups(notes: NoteEvent[]): NoteGroup[] {
   const sorted = [...notes].sort((a, b) => a.time - b.time)
   const groups: NoteGroup[] = []
   for (const n of sorted) {
@@ -463,8 +462,9 @@ export function usePlaybackEngine() {
         if (metronomeRef.current) {
           const secondsPerBeat = 60 / song.bpm
           const beat = Math.floor(t / secondsPerBeat)
+          const beatsPerMeasure = song.timeSignature?.[0] ?? 4
           if (beat !== lastBeatRef.current) {
-            if (Number.isFinite(lastBeatRef.current)) playClick(beat % BEATS_PER_MEASURE === 0)
+            if (Number.isFinite(lastBeatRef.current)) playClick(beat % beatsPerMeasure === 0)
             lastBeatRef.current = beat
           }
         }
