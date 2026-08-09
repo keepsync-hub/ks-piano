@@ -35,7 +35,17 @@ export function buildGroups(notes: NoteEvent[]): NoteGroup[] {
   return groups
 }
 
-export function usePlaybackEngine() {
+interface PlaybackEngineCallbacks {
+  onError?: (midi: number) => void
+  onSongComplete?: (songId: string, errors: number) => void
+}
+
+export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
+  const callbacksRef = useRef(callbacks)
+  useEffect(() => {
+    callbacksRef.current = callbacks
+  }, [callbacks])
+
   const [song, setSongState] = useState<Song | null>(null)
   const [mode, setModeState] = useState<PlaybackMode>('listen')
   const [speed, setSpeedState] = useState(1)
@@ -328,21 +338,25 @@ export function usePlaybackEngine() {
     [isActiveHand],
   )
 
-  const noteOn = useCallback((midi: number, velocity = 0.9) => {
-    void ensureAudioStarted()
-    if (!heldNotesRef.current.has(midi)) {
-      heldNotesRef.current.add(midi)
-      setHeldNotes(new Set(heldNotesRef.current))
+  const noteOn = useCallback(
+    (midi: number, velocity = 0.9) => {
+      void ensureAudioStarted()
+      if (!heldNotesRef.current.has(midi)) {
+        heldNotesRef.current.add(midi)
+        setHeldNotes(new Set(heldNotesRef.current))
 
-      // In practice mode, a key that isn't part of the note we're waiting on is a miss.
-      const required = requiredNotesRef.current
-      if (modeRef.current === 'practice' && required.size > 0 && !required.has(midi)) {
-        errorsRef.current += 1
-        setErrors(errorsRef.current)
+        // In practice mode, a key that isn't part of the note we're waiting on is a miss.
+        const required = requiredNotesRef.current
+        if (modeRef.current === 'practice' && required.size > 0 && !required.has(midi)) {
+          errorsRef.current += 1
+          setErrors(errorsRef.current)
+          callbacksRef.current?.onError?.(midi)
+        }
       }
-    }
-    playNote(midi, velocity)
-  }, [])
+      playNote(midi, velocity)
+    },
+    [],
+  )
 
   const noteOff = useCallback((midi: number) => {
     heldNotesRef.current.delete(midi)
@@ -482,6 +496,7 @@ export function usePlaybackEngine() {
       if (song && playingRef.current && t >= song.duration) {
         pauseAt(song.duration)
         t = song.duration
+        callbacksRef.current?.onSongComplete?.(song.id, errorsRef.current)
       }
 
       setTime(t)

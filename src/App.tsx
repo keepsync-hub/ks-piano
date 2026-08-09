@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { usePlaybackEngine } from './hooks/usePlaybackEngine'
 import { useComputerKeyboard } from './hooks/useComputerKeyboard'
 import { useShortcuts } from './hooks/useShortcuts'
+import { useProgress } from './hooks/useProgress'
+import { useLocalStorage } from './hooks/useLocalStorage'
 import { DEMO_SONGS } from './midi/demoSongs'
 import { SongLibrary } from './components/SongLibrary'
 import { PianoKeyboard } from './components/PianoKeyboard'
@@ -17,13 +19,25 @@ const SheetMusic = lazy(() => import('./components/SheetMusic').then((m) => ({ d
 type StageView = 'falling' | 'sheet' | 'both'
 
 function App() {
-  const engine = usePlaybackEngine()
+  const { recordSongResult, recordPractice, stats, getSongProgress } = useProgress()
+  const [errorFlash, setErrorFlash] = useState<number | null>(null)
+
+  const engine = usePlaybackEngine({
+    onError: (midi) => {
+      setErrorFlash(midi)
+      window.setTimeout(() => setErrorFlash(null), 300)
+    },
+    onSongComplete: (songId, errors) => {
+      recordSongResult(songId, errors, true)
+      recordPractice(engine.song?.duration ?? 0)
+    },
+  })
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
-  const [view, setView] = useState<StageView>('falling')
-  const [lookaheadSeconds, setLookaheadSeconds] = useState(3.5)
-  const [showMeasureLines, setShowMeasureLines] = useState(true)
-  const [showFingering, setShowFingering] = useState(true)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [view, setView] = useLocalStorage<StageView>('ks-piano-view', 'falling')
+  const [lookaheadSeconds, setLookaheadSeconds] = useLocalStorage('ks-piano-lookahead', 3.5)
+  const [showMeasureLines, setShowMeasureLines] = useLocalStorage('ks-piano-measure-lines', true)
+  const [showFingering, setShowFingering] = useLocalStorage('ks-piano-fingering', true)
+  const [sidebarOpen, setSidebarOpen] = useLocalStorage('ks-piano-sidebar', true)
 
   const { togglePlay, restart, seekBy, setMetronomeEnabled, setLoopStart, setLoopEnd, clearLoop, setFingerForCurrent } =
     engine
@@ -51,6 +65,7 @@ function App() {
       setLoopEnd,
       clearLoop,
       setFingerForCurrent,
+      setShowFingering,
     ],
   )
   useShortcuts(shortcutHandlers)
@@ -92,6 +107,11 @@ function App() {
             <span />
           </button>
           <h1>ks-piano</h1>
+          {stats.streakDays > 0 && (
+            <span className="streak-badge" title={`${stats.streakDays} day practice streak`}>
+              🔥 {stats.streakDays}
+            </span>
+          )}
         </div>
         <p className="tagline">
           Piano trainer — falling notes, sheet music, or both at once, with a metronome, section looping and
@@ -151,6 +171,7 @@ function App() {
             soundingHands={engine.soundingHands}
             fingers={engine.keyFingers}
             showFingering={showFingering}
+            errorFlash={errorFlash}
             onNoteOn={engine.noteOn}
             onNoteOff={engine.noteOff}
           />
@@ -165,6 +186,7 @@ function App() {
             isWaitingForInput={engine.isWaitingForInput}
             loop={engine.loop}
             loopEnabled={engine.loopEnabled}
+            songProgress={engine.song ? getSongProgress(engine.song.id) : undefined}
             onTogglePlay={engine.togglePlay}
             onRestart={engine.restart}
             onSeek={engine.seek}

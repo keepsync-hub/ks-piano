@@ -98,6 +98,25 @@
 .key-on-required {
   --key-color: #ffb84d;
 }
+.key-on-error {
+  --key-color: #ff4444;
+}
+
+/* Error flash animation */
+.key-on-error .key-dot {
+  animation: error-pulse 0.3s ease-out;
+}
+
+@keyframes error-pulse {
+  0% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
 
 /* Lit keys keep their natural colour and gain a tint from the indicator. */
 .key-white.key-on {

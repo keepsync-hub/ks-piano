@@ -1,4 +1,5 @@
 import type { LoopRegion } from '../hooks/usePlaybackEngine'
+import type { SongProgress } from '../hooks/useProgress'
 import type { PlaybackMode, Song } from '../types'
 import './TransportControls.css'
 
@@ -13,6 +14,7 @@ interface TransportControlsProps {
   isWaitingForInput: boolean
   loop?: LoopRegion | null
   loopEnabled?: boolean
+  songProgress?: SongProgress
   onTogglePlay: () => void
   onRestart: () => void
   onSeek: (t: number) => void
@@ -37,6 +39,7 @@ export function TransportControls({
   isWaitingForInput,
   loop,
   loopEnabled,
+  songProgress,
   onTogglePlay,
   onRestart,
   onSeek,
@@ -119,6 +122,11 @@ export function TransportControls({
         {mode === 'practice' && (
           <span className={isWaitingForInput ? 'status-pill status-pill-waiting' : 'status-pill'}>
             {isWaitingForInput ? 'Waiting for the highlighted note(s)…' : 'Practice mode'}
+          </span>
+        )}
+        {songProgress && songProgress.bestStars > 0 && (
+          <span className="status-pill status-pill-stars" title={`Best: ${songProgress.bestStars}/3 stars, ${songProgress.bestErrors} errors`}>
+            {'★'.repeat(songProgress.bestStars)}{'☆'.repeat(3 - songProgress.bestStars)}
           </span>
         )}
         <span className="status-pill status-pill-muted">

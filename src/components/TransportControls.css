@@ -130,6 +130,13 @@
   color: #ffb84d;
 }
 
+.status-pill-stars {
+  background: #3d2e0a;
+  color: #ffd700;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
 .status-pill-muted {
   margin-left: auto;
 }

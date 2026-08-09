@@ -12,6 +12,8 @@ interface PianoKeyboardProps {
   /** Suggested finger (1-5) to play each lit key with. */
   fingers?: Map<number, number>
   showFingering?: boolean
+  /** MIDI note that was just played incorrectly (flashes red). */
+  errorFlash?: number | null
   onNoteOn: (midi: number) => void
   onNoteOff: (midi: number) => void
 }
@@ -23,6 +25,7 @@ export function PianoKeyboard({
   soundingHands,
   fingers,
   showFingering = false,
+  errorFlash,
   onNoteOn,
   onNoteOff,
 }: PianoKeyboardProps) {
@@ -30,6 +33,7 @@ export function PianoKeyboard({
   const widthUnits = layout.whiteKeyCount
 
   function keyState(midi: number): string | null {
+    if (errorFlash === midi) return 'error'
     if (heldNotes.has(midi)) return 'input'
     if (requiredNotes.has(midi)) return 'required'
     if (soundingNotes.has(midi)) return soundingHands?.get(midi) === 'left' ? 'left' : 'right'
