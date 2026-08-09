@@ -12,7 +12,7 @@ import './App.css'
 // VexFlow pulls in a large glyph/font payload, so keep it out of the main bundle.
 const SheetMusic = lazy(() => import('./components/SheetMusic').then((m) => ({ default: m.SheetMusic })))
 
-type StageView = 'falling' | 'sheet'
+type StageView = 'falling' | 'sheet' | 'both'
 
 function App() {
   const engine = usePlaybackEngine()
@@ -29,8 +29,8 @@ function App() {
       <header className="app-header">
         <h1>ks-piano</h1>
         <p className="tagline">
-          Piano trainer — switch between falling notes and sheet music, and play along on a MIDI keyboard, your
-          computer keys, or the on-screen keys.
+          Piano trainer — switch between falling notes, sheet music, or both at once, and play along on a MIDI
+          keyboard, your computer keys, or the on-screen keys.
         </p>
         <Legend />
       </header>
@@ -59,11 +59,19 @@ function App() {
               >
                 Sheet music
               </button>
+              <button
+                type="button"
+                className={view === 'both' ? 'view-btn view-btn-active' : 'view-btn'}
+                onClick={() => setView('both')}
+              >
+                Both
+              </button>
             </div>
           </div>
-          {view === 'falling' ? (
+          {view === 'falling' && (
             <FallingNotes song={engine.song} time={engine.time} isWaitingForInput={engine.isWaitingForInput} />
-          ) : (
+          )}
+          {view === 'sheet' && (
             <Suspense fallback={<div className="sheet-music-loading">Loading sheet music renderer…</div>}>
               <SheetMusic
                 song={engine.song}
@@ -72,6 +80,23 @@ function App() {
                 requiredNotes={engine.nextRequiredNotes}
               />
             </Suspense>
+          )}
+          {view === 'both' && (
+            <div className="stage-split">
+              <div className="stage-split-top">
+                <Suspense fallback={<div className="sheet-music-loading">Loading sheet music renderer…</div>}>
+                  <SheetMusic
+                    song={engine.song}
+                    time={engine.time}
+                    heldNotes={engine.heldNotes}
+                    requiredNotes={engine.nextRequiredNotes}
+                  />
+                </Suspense>
+              </div>
+              <div className="stage-split-bottom">
+                <FallingNotes song={engine.song} time={engine.time} isWaitingForInput={engine.isWaitingForInput} />
+              </div>
+            </div>
           )}
           <PianoKeyboard
             heldNotes={engine.heldNotes}
