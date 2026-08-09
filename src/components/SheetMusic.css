@@ -24,25 +24,47 @@
   will-change: transform;
 }
 
-.sheet-music-host svg {
+.sheet-music-host svg,
+.sheet-music-clef-host svg {
   display: block;
 }
 
-/* Engraved notation is black-on-paper; the highlight layer keeps its own fills. */
-.sheet-music-host :is(text, path, line, rect):not(.sheet-highlights *) {
+/* Engraved notation is monochrome ink-on-paper. A note's own opacity (set in
+   SheetMusic.tsx) is the only color-like change applied — no measure tints,
+   no hand colors, no highlight overlays. */
+.sheet-music-host :is(text, path, line, rect),
+.sheet-music-clef-host :is(text, path, line, rect) {
   fill: #14161b;
   stroke: #14161b;
 }
 
-/* Fixed in place — must match PLAYHEAD_FRACTION in SheetMusic.tsx. */
+/* Pinned to the left edge, above the moving score, so the treble/bass clefs
+   and time signature never scroll — only the notes do. Cropped (via a
+   JS-set width) to its measured content so it doesn't reserve more space
+   than the glyphs need. Transparent background: already-played notes keep
+   sliding underneath/through it, faded, until they scroll fully off-screen. */
+.sheet-music-clef-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Fixed in place — must match PLAYHEAD_FRACTION in SheetMusic.tsx. Solid
+   black, not an accent color: the only color change anywhere in this view
+   is a note fading once it passes this line. */
 .sheet-music-playhead {
   position: absolute;
   top: 4px;
   bottom: 4px;
   left: 30%;
-  width: 2px;
-  background: #d94a4a;
+  width: 3px;
+  background: #14161b;
   pointer-events: none;
+  z-index: 2;
 }
 
 .sheet-music-empty {

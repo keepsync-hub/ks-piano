@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   Accidental,
+  Barline,
   Beam,
   Dot,
   Formatter,
@@ -13,6 +14,7 @@ import {
   StaveNote,
   StaveTie,
   Voice,
+  type StemmableNote,
 } from 'vexflow'
 import type { ScoreElement, ScoreLayout } from '../notation/buildScore'
 import { buildScore } from '../notation/buildScore'
@@ -22,46 +24,33 @@ import './SheetMusic.css'
 interface SheetMusicProps {
   song: Song | null
   time: number
-  heldNotes: Set<number>
-  requiredNotes: Set<number>
-  /** Score time of the required group, so only that occurrence is highlighted. */
-  requiredTime?: number | null
   showFingering?: boolean
 }
-
-/** How far from the playhead a note still counts as "the one being played now". */
-const NEAR_PLAYHEAD_SECONDS = 0.4
 
 /**
  * Where the playhead sits, as a fraction of the viewport width — fixed in
  * place by CSS (`.sheet-music-playhead`'s `left`). The score itself slides
  * underneath it via a transform, notes moving right-to-left through it,
- * rather than the old approach of moving the line and auto-scrolling to
- * chase it.
+ * rather than the line moving across a static score.
  */
 const PLAYHEAD_FRACTION = 0.3
 
 const MEASURE_MIN_WIDTH = 120
 /** Breathing room after the last glyph of a measure. */
 const MEASURE_PADDING = 24
-/** Extra room in measure 1 for the clef and time signature. */
-const FIRST_MEASURE_LEAD_IN = 56
 const LEFT_MARGIN = 24
 const RIGHT_PADDING = 30
 const MIN_STAVE_HEIGHT = 150
 const MAX_STAVE_HEIGHT = 320
-// Tuned for the light "paper" background: saturated enough to read over black engraving.
-const MEASURE_TINT = 'rgba(74, 144, 217, 0.16)'
-const NOW_PLAYING_TINT = 'rgba(74, 144, 217, 0.45)'
-const NOTE_TINTS = {
-  input: 'rgba(255, 95, 168, 0.45)',
-  required: 'rgba(255, 152, 0, 0.5)',
-  left: 'rgba(74, 144, 217, 0.45)',
-  right: 'rgba(139, 195, 74, 0.5)',
-}
+/** Generous canvas for the fixed clef panel; it's cropped to its measured width, see below. */
+const CLEF_PANEL_RENDER_WIDTH = 160
+
+/** A note fades to this opacity once the playhead has passed it. */
+const PLAYED_OPACITY = '0.32'
+const UPCOMING_OPACITY = '1'
 
 interface HighlightEntry {
-  rect: SVGRectElement
+  el: SVGElement | undefined
   refs: NoteEvent[]
 }
 
@@ -91,22 +80,15 @@ function buildVexNote(el: ScoreElement, clef: 'treble' | 'bass', showFingering: 
   return note
 }
 
-export function SheetMusic({
-  song,
-  time,
-  heldNotes,
-  requiredNotes,
-  requiredTime,
-  showFingering = false,
-}: SheetMusicProps) {
+export function SheetMusic({ song, time, showFingering = false }: SheetMusicProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
+  const clefPanelRef = useRef<HTMLDivElement>(null)
+  const clefHostRef = useRef<HTMLDivElement>(null)
   const highlightsRef = useRef<HighlightEntry[]>([])
   const measureXRef = useRef<number[]>([])
   const scoreRef = useRef<ScoreLayout | null>(null)
-  const measureRectRef = useRef<SVGRectElement | null>(null)
-  const nowPlayingRectRef = useRef<SVGRectElement | null>(null)
   const staveHeightRef = useRef(0)
 
   const score = useMemo(() => (song ? buildScore(song) : null), [song])
@@ -115,13 +97,14 @@ export function SheetMusic({
   // Read via a ref inside positionScore() so it stays correct even when
   // called from the build effect below, whose closure only refreshes when
   // `score`/`showFingering` change — not on every playback tick.
-  const latestRef = useRef({ time, heldNotes, requiredNotes, requiredTime })
-  latestRef.current = { time, heldNotes, requiredNotes, requiredTime }
+  const latestRef = useRef({ time })
+  latestRef.current = { time }
 
   /**
    * Slides the score under the fixed playhead line so the note due "now"
-   * lines up with it, and updates the highlight fills. Safe to call from
-   * anywhere — it reads everything through refs rather than closured props.
+   * lines up with it, and fades notes that have already passed it. Safe to
+   * call from anywhere — it reads everything through refs rather than
+   * closured props.
    */
   function positionScore() {
     const layout = scoreRef.current
@@ -130,7 +113,7 @@ export function SheetMusic({
     const scrollEl = scrollRef.current
     if (!layout || !inner || !scrollEl || xs.length < 2) return
 
-    const { time, heldNotes, requiredNotes, requiredTime } = latestRef.current
+    const { time } = latestRef.current
 
     // Locate the playhead through the measure time table, which already went
     // through the tempo map, instead of assuming one constant tempo.
@@ -148,50 +131,10 @@ export function SheetMusic({
     const playheadX = scrollEl.clientWidth * PLAYHEAD_FRACTION
     inner.style.transform = `translateX(${playheadX - x}px)`
 
-    const measureRect = measureRectRef.current
-    if (measureRect) {
-      measureRect.setAttribute('x', String(xs[measureIdx]))
-      measureRect.setAttribute('width', String(measureWidth))
-      measureRect.style.fill = MEASURE_TINT
-    }
-
-    let playingMinX = Infinity
-    let playingMaxX = -Infinity
-
-    for (const { rect, refs } of highlightsRef.current) {
-      let fill = 'transparent'
-      // Scoped by score time, otherwise every other occurrence of the same
-      // pitch elsewhere in the piece would light up too.
-      const anySounding = refs.some((r) => time >= r.time && time < r.time + r.duration)
-      const anyRequired =
-        requiredTime != null && refs.some((r) => requiredNotes.has(r.midi) && Math.abs(r.time - requiredTime) < 0.05)
-      const anyHeld = refs.some(
-        (r) =>
-          heldNotes.has(r.midi) &&
-          (Math.abs(r.time - time) < NEAR_PLAYHEAD_SECONDS || (time >= r.time && time < r.time + r.duration)),
-      )
-      if (anyHeld) fill = NOTE_TINTS.input
-      else if (anyRequired) fill = NOTE_TINTS.required
-      else if (anySounding) fill = NOTE_TINTS[refs[0].hand]
-      rect.style.fill = fill
-
-      if (anyHeld || anySounding) {
-        const rx = parseFloat(rect.getAttribute('x') ?? '0')
-        const rw = parseFloat(rect.getAttribute('width') ?? '0')
-        playingMinX = Math.min(playingMinX, rx)
-        playingMaxX = Math.max(playingMaxX, rx + rw)
-      }
-    }
-
-    const nowPlayingRect = nowPlayingRectRef.current
-    if (nowPlayingRect) {
-      if (playingMaxX > playingMinX) {
-        nowPlayingRect.setAttribute('x', String(playingMinX - 3))
-        nowPlayingRect.setAttribute('width', String(playingMaxX - playingMinX + 6))
-        nowPlayingRect.style.fill = NOW_PLAYING_TINT
-      } else {
-        nowPlayingRect.style.fill = 'transparent'
-      }
+    for (const { el, refs } of highlightsRef.current) {
+      if (!el) continue
+      const passed = refs.every((r) => time >= r.time)
+      el.style.opacity = passed ? PLAYED_OPACITY : UPCOMING_OPACITY
     }
   }
 
@@ -205,15 +148,38 @@ export function SheetMusic({
       host.innerHTML = ''
       highlightsRef.current = []
       measureXRef.current = []
-      measureRectRef.current = null
-      nowPlayingRectRef.current = null
-      if (!score || score.measures.length === 0) return
+      const clefHost = clefHostRef.current
+      if (clefHost) clefHost.innerHTML = ''
+
+      if (!score || score.measures.length === 0) {
+        if (clefPanelRef.current) clefPanelRef.current.style.width = '0px'
+        return
+      }
 
       const containerHeight = scrollEl?.clientHeight || MIN_STAVE_HEIGHT
       const staveHeight = Math.max(MIN_STAVE_HEIGHT, Math.min(MAX_STAVE_HEIGHT, containerHeight))
       staveHeightRef.current = staveHeight
       const trebleY = staveHeight * 0.09
       const bassY = staveHeight * 0.52
+      const timeSpec = `${score.timeSignature[0]}/${score.timeSignature[1]}`
+
+      // Fixed panel: just the clef, time signature and brace, pinned to the
+      // left edge and never touched by the transform below. It's cropped to
+      // its measured width, so the moving score isn't reserving space for it.
+      if (clefHost && clefPanelRef.current) {
+        const clefRenderer = new Renderer(clefHost, Renderer.Backends.SVG)
+        clefRenderer.resize(CLEF_PANEL_RENDER_WIDTH, staveHeight)
+        const clefContext = clefRenderer.getContext()
+        const clefTreble = new Stave(0, trebleY, CLEF_PANEL_RENDER_WIDTH)
+        const clefBass = new Stave(0, bassY, CLEF_PANEL_RENDER_WIDTH)
+        clefTreble.addClef('treble').addTimeSignature(timeSpec).setEndBarType(Barline.type.NONE)
+        clefBass.addClef('bass').addTimeSignature(timeSpec).setEndBarType(Barline.type.NONE)
+        clefTreble.setContext(clefContext).draw()
+        clefBass.setContext(clefContext).draw()
+        new StaveConnector(clefTreble, clefBass).setType('brace').setContext(clefContext).draw()
+        new StaveConnector(clefTreble, clefBass).setType('singleLeft').setContext(clefContext).draw()
+        clefPanelRef.current.style.width = `${clefTreble.getNoteStartX() + 8}px`
+      }
 
       // Pass 1 — build both hands' voices per measure and ask VexFlow how much
       // room they actually need. Sizing from a glyph count instead would let
@@ -242,10 +208,7 @@ export function SheetMusic({
         return { trebleNotes, bassNotes, trebleVoice, bassVoice, voices, formatter, minWidth }
       })
 
-      const widths = built.map((b, i) => {
-        const leadIn = i === 0 ? FIRST_MEASURE_LEAD_IN : 0
-        return Math.max(MEASURE_MIN_WIDTH, Math.ceil(b.minWidth) + MEASURE_PADDING + leadIn)
-      })
+      const widths = built.map((b) => Math.max(MEASURE_MIN_WIDTH, Math.ceil(b.minWidth) + MEASURE_PADDING))
       const xs: number[] = [LEFT_MARGIN]
       for (const w of widths) xs.push(xs[xs.length - 1] + w)
       measureXRef.current = xs
@@ -255,58 +218,25 @@ export function SheetMusic({
       renderer.resize(totalWidth, staveHeight)
       const context = renderer.getContext()
 
-      const svg = host.querySelector('svg')
-      const highlightLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-      highlightLayer.setAttribute('class', 'sheet-highlights')
-      svg?.insertBefore(highlightLayer, svg.firstChild)
-
-      // Current-measure tint and now-playing bar sit behind the individual note highlights.
-      const measureRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-      measureRect.setAttribute('y', String(-6))
-      measureRect.setAttribute('height', String(staveHeight + 12))
-      measureRect.style.fill = 'transparent'
-      highlightLayer.appendChild(measureRect)
-      measureRectRef.current = measureRect
-
-      const nowPlayingRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-      nowPlayingRect.setAttribute('y', String(-6))
-      nowPlayingRect.setAttribute('height', String(staveHeight + 12))
-      nowPlayingRect.setAttribute('rx', '5')
-      nowPlayingRect.style.fill = 'transparent'
-      highlightLayer.appendChild(nowPlayingRect)
-      nowPlayingRectRef.current = nowPlayingRect
-
       const entries: HighlightEntry[] = []
 
-      // Pass 2 — place the staves at their computed widths and engrave.
+      // Pass 2 — place the staves at their computed widths and engrave. No
+      // clef/time-signature here — that's the fixed panel's job now, so
+      // every measure (including the first) is laid out identically.
       score.measures.forEach((measure, i) => {
         const x = xs[i]
         const width = widths[i]
-        const isFirst = i === 0
         const b = built[i]
 
         const treble = new Stave(x, trebleY, width)
         const bass = new Stave(x, bassY, width)
-        if (isFirst) {
-          const timeSpec = `${score.timeSignature[0]}/${score.timeSignature[1]}`
-          treble.addClef('treble')
-          treble.addTimeSignature(timeSpec)
-          bass.addClef('bass')
-          bass.addTimeSignature(timeSpec)
-        }
         treble.setContext(context).draw()
         bass.setContext(context).draw()
-
-        if (isFirst) {
-          new StaveConnector(treble, bass).setType('brace').setContext(context).draw()
-          new StaveConnector(treble, bass).setType('singleLeft').setContext(context).draw()
-        }
 
         b.trebleVoice?.setStave(treble)
         b.bassVoice?.setStave(bass)
         if (b.voices.length) {
-          const noteAreaStart = isFirst ? treble.getNoteStartX() - x : 0
-          b.formatter.format(b.voices, Math.max(20, width - MEASURE_PADDING - noteAreaStart))
+          b.formatter.format(b.voices, Math.max(20, width - MEASURE_PADDING))
         }
 
         for (const [staveEls, stave, vexNotes, voice] of [
@@ -315,6 +245,11 @@ export function SheetMusic({
         ] as const) {
           if (!voice || staveEls.length === 0) continue
 
+          const refsByVexNote = new Map<StemmableNote, NoteEvent[]>()
+          staveEls.forEach((el, idx) => {
+            if (el.kind === 'note') refsByVexNote.set(vexNotes[idx], el.refs)
+          })
+
           // Beam eighths and shorter within each beat instead of drawing loose flags.
           const beams = Beam.generateBeams(vexNotes, {
             // Compound meters (6/8, 12/8) group in dotted-quarter beats.
@@ -322,7 +257,14 @@ export function SheetMusic({
             maintainStemDirections: true,
           })
           voice.draw(context, stave)
-          for (const beam of beams) beam.setContext(context).draw()
+          for (const beam of beams) {
+            beam.setContext(context).draw()
+            // A beam fades once every note it connects has passed the line —
+            // fading it as soon as the first one does would grey out notes
+            // still ahead of the playhead.
+            const beamRefs = beam.notes.flatMap((n) => refsByVexNote.get(n) ?? [])
+            if (beamRefs.length) entries.push({ el: beam.getSVGElement(), refs: beamRefs })
+          }
 
           // Tie note heads that were split across a barline or a beat boundary.
           staveEls.forEach((el, idx) => {
@@ -334,17 +276,7 @@ export function SheetMusic({
 
           staveEls.forEach((el, idx) => {
             if (el.kind !== 'note') return
-            const bbox = vexNotes[idx].getBoundingBox()
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-            rect.setAttribute('x', String(bbox.getX() - 4))
-            rect.setAttribute('y', String(bbox.getY() - 4))
-            rect.setAttribute('width', String(bbox.getW() + 8))
-            rect.setAttribute('height', String(bbox.getH() + 8))
-            rect.setAttribute('rx', '4')
-            rect.style.fill = 'transparent'
-            rect.style.stroke = 'none'
-            highlightLayer.appendChild(rect)
-            entries.push({ rect, refs: el.refs })
+            entries.push({ el: vexNotes[idx].getSVGElement(), refs: el.refs })
           })
         }
       })
@@ -381,13 +313,16 @@ export function SheetMusic({
   useLayoutEffect(() => {
     positionScore()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [time, heldNotes, requiredNotes, requiredTime])
+  }, [time])
 
   return (
     <div className="sheet-music-wrap">
       <div className="sheet-music-scroll" ref={scrollRef}>
         <div ref={innerRef} className="sheet-music-inner">
           <div ref={hostRef} className="sheet-music-host" />
+        </div>
+        <div ref={clefPanelRef} className="sheet-music-clef-panel">
+          <div ref={clefHostRef} className="sheet-music-clef-host" />
         </div>
         <div className="sheet-music-playhead" />
       </div>
