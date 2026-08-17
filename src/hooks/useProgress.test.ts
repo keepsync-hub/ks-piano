@@ -18,12 +18,7 @@ describe('useProgress', () => {
     expect(result.current.stats.songsCompleted).toBe(0)
     expect(result.current.stats.level).toBe(1)
     expect(result.current.stats.totalXp).toBe(0)
-  })
-
-  it('gives a child profile a lower default daily goal than an adult profile', () => {
-    const child = renderHook(() => useProgress('kid', 'child'))
-    const adult = renderHook(() => useProgress('grownup', 'adult'))
-    expect(child.result.current.stats.dailyGoalXp).toBeLessThan(adult.result.current.stats.dailyGoalXp)
+    expect(result.current.stats.dailyGoalMet).toBe(false)
   })
 
   it('awards XP for practice time', () => {
@@ -32,63 +27,102 @@ describe('useProgress', () => {
       result.current.recordPractice(300)
     })
     expect(result.current.stats.totalXp).toBe(30)
-    expect(result.current.stats.todayXp).toBe(30)
   })
 
-  it('increments the streak only once the daily goal is met', () => {
-    const { result } = renderHook(() => useProgress('p1', 'adult'))
-    // Adult default daily goal is 20 XP; 5 minutes of practice = 30 XP, so it clears in one go.
-    act(() => {
-      result.current.recordPractice(50) // 5 XP, below goal
-    })
-    expect(result.current.stats.streakDays).toBe(0)
+  it('meets the daily goal and starts a streak once a workout session is completed', () => {
+    const { result } = renderHook(() => useProgress('p1'))
+    expect(result.current.stats.dailyGoalMet).toBe(false)
 
     act(() => {
-      result.current.recordPractice(300) // +30 XP, now well past the goal
+      result.current.recordWorkoutCompleted()
     })
     expect(result.current.stats.dailyGoalMet).toBe(true)
     expect(result.current.stats.streakDays).toBe(1)
 
-    // A second practice the same day should not double-count the streak.
+    // A second workout the same day should not double-count the streak.
     act(() => {
-      result.current.recordPractice(300)
+      result.current.recordWorkoutCompleted()
     })
     expect(result.current.stats.streakDays).toBe(1)
+    expect(result.current.stats.todayWorkouts).toBe(2)
   })
 
-  it('extends the streak on the next consecutive day the goal is met, and resets on a gap', () => {
-    const { result } = renderHook(() => useProgress('p1', 'adult'))
+  it('extends the streak on the next consecutive day a workout is completed, and resets on a gap', () => {
+    const { result } = renderHook(() => useProgress('p1'))
     act(() => {
-      result.current.recordPractice(300)
+      result.current.recordWorkoutCompleted()
     })
     expect(result.current.stats.streakDays).toBe(1)
 
     vi.setSystemTime(new Date(Date.now() + 24 * 60 * 60 * 1000))
     act(() => {
-      result.current.recordPractice(300)
+      result.current.recordWorkoutCompleted()
     })
     expect(result.current.stats.streakDays).toBe(2)
+    expect(result.current.stats.dailyGoalMet).toBe(true)
 
     vi.setSystemTime(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
     act(() => {
-      result.current.recordPractice(300)
+      result.current.recordWorkoutCompleted()
     })
     expect(result.current.stats.streakDays).toBe(1)
   })
 
-  it('records song results with star ratings and awards completion XP', () => {
+  it('does not meet the daily goal from practice or song results alone, only a completed workout', () => {
     const { result } = renderHook(() => useProgress('p1'))
-
     act(() => {
-      result.current.recordSongResult('song-1', 0, true)
+      result.current.recordPractice(300)
+      result.current.recordSongResult('song-1', 0, true, 10)
+    })
+    expect(result.current.stats.dailyGoalMet).toBe(false)
+    expect(result.current.stats.streakDays).toBe(0)
+  })
+
+  it('awards 3 stars for a perfect run', () => {
+    const { result } = renderHook(() => useProgress('p1'))
+    act(() => {
+      result.current.recordSongResult('song-1', 0, true, 20)
     })
     expect(result.current.getSongProgress('song-1')?.bestStars).toBe(3)
     expect(result.current.stats.totalXp).toBe(40) // 3-star completion bonus
+  })
+
+  it('awards 2 stars for an error rate at or under 20%', () => {
+    const { result } = renderHook(() => useProgress('p1'))
+    act(() => {
+      result.current.recordSongResult('song-1', 4, true, 20) // exactly 20% errors
+    })
+    expect(result.current.getSongProgress('song-1')?.bestStars).toBe(2)
+  })
+
+  it('awards only 1 star for an error rate over 20%', () => {
+    const { result } = renderHook(() => useProgress('p1'))
+    act(() => {
+      result.current.recordSongResult('song-1', 5, true, 20) // 25% errors
+    })
+    expect(result.current.getSongProgress('song-1')?.bestStars).toBe(1)
+  })
+
+  it('awards no stars for an incomplete attempt', () => {
+    const { result } = renderHook(() => useProgress('p1'))
+    act(() => {
+      result.current.recordSongResult('song-1', 10, false, 20)
+    })
+    expect(result.current.getSongProgress('song-1')?.bestStars).toBe(0)
+  })
+
+  it('tracks best stars and best errors across attempts', () => {
+    const { result } = renderHook(() => useProgress('p1'))
 
     act(() => {
-      result.current.recordSongResult('song-1', 2, true)
+      result.current.recordSongResult('song-1', 0, true, 20)
     })
-    // Best stars should stay at 3
+    expect(result.current.getSongProgress('song-1')?.bestStars).toBe(3)
+
+    act(() => {
+      result.current.recordSongResult('song-1', 6, true, 20)
+    })
+    // Best stars should stay at 3, but times completed still increments.
     expect(result.current.getSongProgress('song-1')?.bestStars).toBe(3)
     expect(result.current.getSongProgress('song-1')?.bestErrors).toBe(0)
     expect(result.current.getSongProgress('song-1')?.timesCompleted).toBe(2)
@@ -98,8 +132,8 @@ describe('useProgress', () => {
     const { result } = renderHook(() => useProgress('p1'))
 
     act(() => {
-      result.current.recordSongResult('song-1', 0, true)
-      result.current.recordSongResult('song-2', 2, true)
+      result.current.recordSongResult('song-1', 0, true, 20)
+      result.current.recordSongResult('song-2', 4, true, 20)
     })
     expect(result.current.stats.totalStars).toBe(5)
   })
@@ -107,7 +141,7 @@ describe('useProgress', () => {
   it('flags a mastered song as due for review only after it goes stale', () => {
     const { result } = renderHook(() => useProgress('p1'))
     act(() => {
-      result.current.recordSongResult('song-1', 0, true)
+      result.current.recordSongResult('song-1', 0, true, 20)
     })
     expect(result.current.isDueForReview('song-1')).toBe(false)
 
@@ -129,13 +163,5 @@ describe('useProgress', () => {
     })
     expect(a.result.current.stats.totalXp).toBe(30)
     expect(b.result.current.stats.totalXp).toBe(0)
-  })
-
-  it('allows changing the daily goal', () => {
-    const { result } = renderHook(() => useProgress('p1', 'child'))
-    act(() => {
-      result.current.setDailyGoalXp(50)
-    })
-    expect(result.current.stats.dailyGoalXp).toBe(50)
   })
 })

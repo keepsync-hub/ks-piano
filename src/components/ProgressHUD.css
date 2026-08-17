@@ -53,7 +53,8 @@
   font-size: 8px;
   font-weight: 700;
   color: #cfd3de;
-  background: conic-gradient(#4ac97e var(--goal-pct, 0%), #1a1e28 0);
+  background: #1a1e28;
+  border: 2px solid #2c3140;
 }
 
 .hud-goal-met .hud-goal-ring {

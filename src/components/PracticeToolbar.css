@@ -1,18 +1,71 @@
+.toolbar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 39;
+}
+
 .practice-toolbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(300px, 88vw);
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 18px;
-  padding: 8px 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 16px;
   background: #12141a;
-  border-top: 1px solid #23262f;
+  border-left: 1px solid #23262f;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
   font-size: 12px;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 40;
+}
+
+.practice-toolbar-open {
+  transform: translateX(0);
+}
+
+.toolbar-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #23262f;
+}
+
+.toolbar-drawer-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e6e8ee;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.toolbar-close-btn {
+  background: #1c2029;
+  border: 1px solid #2c3140;
+  color: #cfd3de;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toolbar-close-btn:hover {
+  background: #262c38;
 }
 
 .tool-group {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .tool-label {
@@ -20,6 +73,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 10.5px;
+  width: 100%;
   margin-right: 2px;
 }
 
