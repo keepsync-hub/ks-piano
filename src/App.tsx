@@ -31,6 +31,7 @@ function App() {
   const { recordSongResult, recordPractice, recordWorkoutCompleted, stats, getSongProgress, isDueForReview } =
     useProgress(profileId)
   const [errorFlash, setErrorFlash] = useState<number | null>(null)
+  const [successFlash, setSuccessFlash] = useState<number | null>(null)
   const workoutCompleteRef = useRef<(() => void) | null>(null)
   const workoutNoteRef = useRef<((correct: boolean) => void) | null>(null)
 
@@ -44,7 +45,11 @@ function App() {
       recordPractice(engine.song?.duration ?? 0)
       workoutCompleteRef.current?.()
     },
-    onNotePlayed: (_midi, correct) => {
+    onNotePlayed: (midi, correct) => {
+      if (correct) {
+        setSuccessFlash(midi)
+        window.setTimeout(() => setSuccessFlash(null), 260)
+      }
       workoutNoteRef.current?.(correct)
     },
   })
@@ -252,6 +257,7 @@ function App() {
             fingers={engine.keyFingers}
             showFingering={showFingering}
             errorFlash={errorFlash}
+            successFlash={successFlash}
             onNoteOn={engine.noteOn}
             onNoteOff={engine.noteOff}
           />

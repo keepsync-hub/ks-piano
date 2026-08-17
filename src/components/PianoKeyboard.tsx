@@ -14,6 +14,8 @@ interface PianoKeyboardProps {
   showFingering?: boolean
   /** MIDI note that was just played incorrectly (flashes red). */
   errorFlash?: number | null
+  /** MIDI note that was just played correctly (flashes green, briefly). */
+  successFlash?: number | null
   onNoteOn: (midi: number) => void
   onNoteOff: (midi: number) => void
 }
@@ -26,6 +28,7 @@ export function PianoKeyboard({
   fingers,
   showFingering = false,
   errorFlash,
+  successFlash,
   onNoteOn,
   onNoteOff,
 }: PianoKeyboardProps) {
@@ -34,6 +37,7 @@ export function PianoKeyboard({
 
   function keyState(midi: number): string | null {
     if (errorFlash === midi) return 'error'
+    if (successFlash === midi) return 'success'
     if (heldNotes.has(midi)) return 'input'
     if (requiredNotes.has(midi)) return 'required'
     if (soundingNotes.has(midi)) return soundingHands?.get(midi) === 'left' ? 'left' : 'right'

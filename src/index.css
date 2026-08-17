@@ -1,6 +1,41 @@
 :root {
   color-scheme: dark;
-  font: 14px/1.4 -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font: 14px/1.4 ui-rounded, 'Segoe UI Rounded', -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Surfaces */
+  --bg: #0a0b0e;
+  --bg-elevated: #14161d;
+  --bg-panel: #1c2029;
+  --bg-panel-hover: #262c38;
+  --border: #2c3140;
+  --border-soft: #23262f;
+
+  /* Text */
+  --text: #e6e8ee;
+  --text-muted: #8a90a2;
+  --text-faint: #6a7080;
+
+  /* Brand / motivation accents — kept distinct from the functional note colours
+     (left=blue, right=green, input=pink, required=amber) so a UI accent never
+     reads as a note-state hint. */
+  --brand: #7c5cff;
+  --brand-light: #a78bfa;
+  --brand-dark: #5b3ce0;
+  --success: #4ac97e;
+  --success-dark: #2f9d5c;
+  --warm: #ff6b35;
+  --warm-light: #ff8c42;
+  --gold: #ffb84d;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -12,10 +47,61 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  background: #0a0b0e;
-  color: #e6e8ee;
+  background: var(--bg);
+  color: var(--text);
 }
 
 button {
   font: inherit;
+}
+
+/* Tactile "3D" primary button, in the spirit of Duolingo's chunky pill CTAs:
+   a solid bottom edge that compresses on press instead of just dimming. */
+.btn-tactile {
+  border-radius: var(--radius-md);
+  box-shadow: 0 3px 0 var(--btn-shadow, var(--brand-dark));
+  transition:
+    transform 0.12s var(--ease-out),
+    box-shadow 0.12s var(--ease-out),
+    background 0.15s;
+}
+
+.btn-tactile:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--btn-shadow, var(--brand-dark));
+}
+
+.btn-tactile:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--btn-shadow, var(--brand-dark));
+}
+
+.btn-tactile:disabled {
+  box-shadow: none;
+  transform: none;
+}
+
+/* Shared entrance "pop" for badges/emoji that just turned on (goal met,
+   profile type selected, star ratings) — reused across components. */
+@keyframes pop-in {
+  0% {
+    transform: scale(0.5);
+  }
+  65% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

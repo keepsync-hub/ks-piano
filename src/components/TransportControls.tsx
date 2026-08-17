@@ -149,8 +149,13 @@ export function TransportControls({
           </span>
         )}
         {songProgress && songProgress.bestStars > 0 && (
-          <span className="status-pill status-pill-stars" title={`Best: ${songProgress.bestStars}/3 stars, ${songProgress.bestErrors} errors`}>
-            {'★'.repeat(songProgress.bestStars)}{'☆'.repeat(3 - songProgress.bestStars)}
+          <span
+            className="status-pill status-pill-stars"
+            title={`Best: ${songProgress.bestStars}/3 stars, ${songProgress.bestErrors} errors`}
+          >
+            {Array.from({ length: 3 }, (_, i) => (
+              <span key={i}>{i < songProgress.bestStars ? '★' : '☆'}</span>
+            ))}
           </span>
         )}
         <span className="status-pill status-pill-muted">

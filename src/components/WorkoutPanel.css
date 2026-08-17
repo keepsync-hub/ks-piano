@@ -3,33 +3,46 @@
   align-items: center;
   gap: 12px;
   padding: 8px 16px;
-  background: #12141a;
-  border-top: 1px solid #23262f;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-soft);
 }
 
 .workout-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid #2c3140;
-  background: #1c2029;
-  color: #e6e8ee;
+  padding: 7px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text);
   font-size: 12.5px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.12s var(--ease-out);
 }
 
 .workout-btn:hover {
-  background: #262c38;
+  background: var(--bg-panel-hover);
+  transform: translateY(-1px);
 }
 
 .workout-btn-start {
-  background: #3564e0;
-  border-color: #4a76ef;
-  font-weight: 600;
+  --btn-shadow: var(--success-dark);
+  background: var(--success);
+  border: none;
+  color: #06180e;
+  font-weight: 700;
+  box-shadow: 0 3px 0 var(--success-dark);
 }
 
 .workout-btn-start:hover {
-  background: #4a76ef;
+  background: #5cdb8f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--success-dark);
+}
+
+.workout-btn-start:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--success-dark);
 }
 
 .workout-btn-next {
@@ -53,7 +66,7 @@
   font-size: 18px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: #ffb84d;
+  color: var(--gold);
   min-width: 70px;
 }
 
@@ -66,7 +79,7 @@
 
 .workout-live-stat {
   font-size: 12px;
-  color: #9aa0b0;
+  color: var(--text-muted);
 }
 
 .workout-actions {
@@ -75,8 +88,10 @@
 }
 
 .workout-panel-finished {
+  position: relative;
   justify-content: center;
   padding: 16px;
+  overflow: hidden;
 }
 
 .workout-summary {
@@ -85,8 +100,10 @@
 
 .workout-summary h3 {
   margin: 0 0 12px;
-  font-size: 16px;
-  color: #e6e8ee;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  animation: pop-in 0.5s var(--ease-bounce);
 }
 
 .workout-stats {
@@ -100,17 +117,30 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  opacity: 0;
+  animation: stat-rise 0.4s var(--ease-out) forwards;
+}
+
+@keyframes stat-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .workout-stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #4a90d9;
+  font-size: 25px;
+  font-weight: 800;
+  color: var(--brand-light);
 }
 
 .workout-stat-label {
   font-size: 11px;
-  color: #8a90a2;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }

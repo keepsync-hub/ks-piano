@@ -13,28 +13,50 @@
 
 .hud-level-badge {
   font-size: 11px;
-  font-weight: 700;
-  color: #cfe0ff;
-  background: #1c2a4a;
-  border: 1px solid #2e4272;
-  border-radius: 999px;
-  padding: 2px 8px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand-light), var(--brand));
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
   white-space: nowrap;
 }
 
 .hud-xp-bar {
+  position: relative;
   width: 56px;
-  height: 5px;
-  border-radius: 999px;
+  height: 6px;
+  border-radius: var(--radius-pill);
   background: #1a1e28;
   overflow: hidden;
 }
 
 .hud-xp-fill {
+  position: relative;
   height: 100%;
-  background: linear-gradient(90deg, #3564e0, #4a76ef);
-  border-radius: 999px;
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--brand), var(--brand-light));
+  border-radius: var(--radius-pill);
+  transition: width 0.5s var(--ease-out);
+  overflow: hidden;
+}
+
+/* A soft light sweep drifting across the filled portion — a quiet "alive"
+   cue, distinct from the discrete bounce used for one-off events. */
+.hud-xp-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: xp-shine 2.4s linear infinite;
+}
+
+@keyframes xp-shine {
+  0% {
+    background-position: 140% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
 }
 
 .hud-goal {
@@ -54,18 +76,23 @@
   font-weight: 700;
   color: #cfd3de;
   background: #1a1e28;
-  border: 2px solid #2c3140;
+  border: 2px solid var(--border);
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 
 .hud-goal-met .hud-goal-ring {
   color: #0d0f14;
-  background: #4ac97e;
+  background: var(--success);
+  border-color: var(--success);
   font-size: 11px;
+  animation: pop-in 0.4s var(--ease-bounce);
 }
 
 .hud-goal-label {
   font-size: 11px;
-  color: #8a90a2;
+  color: var(--text-muted);
   display: none;
 }
 

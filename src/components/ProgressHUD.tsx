@@ -30,7 +30,7 @@ export function ProgressHUD({ level, xpIntoLevel, xpForNextLevel, dailyGoalMet, 
 
       {streakDays > 0 && (
         <span className="streak-badge" title={`${streakDays} day practice streak`}>
-          🔥 {streakDays}
+          <span className="streak-flame">🔥</span> {streakDays}
         </span>
       )}
     </div>
