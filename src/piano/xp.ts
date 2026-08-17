@@ -13,20 +13,6 @@ const SONG_COMPLETION_XP = [10, 20, 30, 40]
 /** Flat XP for starting the practice loop, even before finishing a song. */
 export const XP_PER_LEVEL = 100
 
-export interface DailyGoalPreset {
-  id: 'casual' | 'regular' | 'serious' | 'intense'
-  label: string
-  xp: number
-}
-
-/** Mirrors Duolingo's four daily-goal tiers, renamed for a practice context. */
-export const DAILY_GOAL_PRESETS: DailyGoalPreset[] = [
-  { id: 'casual', label: 'Casual — 5 min', xp: 10 },
-  { id: 'regular', label: 'Regular — 10 min', xp: 20 },
-  { id: 'serious', label: 'Serious — 15 min', xp: 30 },
-  { id: 'intense', label: 'Intense — 25 min', xp: 50 },
-]
-
 export function xpForPracticeSeconds(seconds: number): number {
   return Math.round(Math.max(0, seconds) * XP_PER_PRACTICE_SECOND)
 }
@@ -51,8 +37,4 @@ export function levelForXp(totalXp: number): LevelInfo {
     xpIntoLevel: safeXp % XP_PER_LEVEL,
     xpForNextLevel: XP_PER_LEVEL,
   }
-}
-
-export function defaultDailyGoalXp(profileType: 'child' | 'adult'): number {
-  return profileType === 'child' ? DAILY_GOAL_PRESETS[0].xp : DAILY_GOAL_PRESETS[1].xp
 }

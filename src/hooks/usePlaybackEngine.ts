@@ -70,7 +70,7 @@ export function getHandGain(mixer: MixerState, hand: Hand): number {
 
 interface PlaybackEngineCallbacks {
   onError?: (midi: number) => void
-  onSongComplete?: (songId: string, errors: number) => void
+  onSongComplete?: (songId: string, errors: number, totalNotes: number) => void
   onNotePlayed?: (midi: number, correct: boolean) => void
 }
 
@@ -562,7 +562,7 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
       if (song && playingRef.current && t >= song.duration) {
         pauseAt(song.duration)
         t = song.duration
-        callbacksRef.current?.onSongComplete?.(song.id, errorsRef.current)
+        callbacksRef.current?.onSongComplete?.(song.id, errorsRef.current, activeNotesRef.current.length)
       }
 
       setTime(t)

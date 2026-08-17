@@ -45,6 +45,63 @@ describe('scoreDifficulty', () => {
   })
 })
 
+function satbNote(midi: number, time: number, hand: NoteEvent['hand'], voice: 0 | 1): NoteEvent {
+  return { midi, time, duration: 0.4, velocity: 0.8, hand, voice }
+}
+
+describe('scoreDifficulty for SATB (hymn) songs', () => {
+  // A two-voice-per-hand chord (soprano+alto, tenor+bass moving together) is
+  // the normal shape of every hymn — the generic formula would read that as
+  // "wide chords" and rate almost everything as advanced, so SATB-tagged
+  // songs (see NoteEvent.voice) go through a dedicated formula instead.
+  function satbSong(overrides: Partial<Song> & Pick<Song, 'notes' | 'duration'>): Song {
+    return { id: 's', title: 't', bpm: 90, ...overrides }
+  }
+
+  it('rates a slow, narrow-range, unaccidented hymn as low difficulty despite the paired voices', () => {
+    const notes: NoteEvent[] = []
+    for (let beat = 0; beat < 8; beat++) {
+      notes.push(satbNote(64, beat * 0.5, 'right', 0), satbNote(60, beat * 0.5, 'right', 1))
+      notes.push(satbNote(52, beat * 0.5, 'left', 0), satbNote(48, beat * 0.5, 'left', 1))
+    }
+    const s = satbSong({ notes, duration: 4, bpm: 76, keySignature: 'C Major', timeSignature: [4, 4] })
+    expect(scoreDifficulty(s)).toBeLessThan(20)
+  })
+
+  it('scores a fast, wide-range hymn in a heavily accidented compound meter higher', () => {
+    const notes: NoteEvent[] = []
+    for (let beat = 0; beat < 24; beat++) {
+      notes.push(satbNote(40 + (beat % 40), beat * 0.15, 'right', 0), satbNote(36 + (beat % 40), beat * 0.15, 'right', 1))
+      notes.push(satbNote(30 + (beat % 20), beat * 0.15, 'left', 0), satbNote(26 + (beat % 20), beat * 0.15, 'left', 1))
+    }
+    const s = satbSong({ notes, duration: 4, bpm: 160, keySignature: 'F# Major', timeSignature: [12, 8] })
+    expect(scoreDifficulty(s)).toBeGreaterThan(
+      scoreDifficulty(
+        satbSong({
+          notes: notes.map((n) => ({ ...n, time: n.time * 4 })),
+          duration: 16,
+          bpm: 70,
+          keySignature: 'C Major',
+          timeSignature: [4, 4],
+        }),
+      ),
+    )
+  })
+
+  it('does not treat a plain two-hand chordal song (no voice field) as SATB', () => {
+    // Same shape as the "fast, wide-range, two-hand chordal song" case above,
+    // just without NoteEvent.voice — must keep going through the generic formula.
+    const notes: NoteEvent[] = []
+    for (let beat = 0; beat < 16; beat++) {
+      notes.push(note(60 + (beat % 24), beat * 0.25, 'right'))
+      notes.push(note(40 + (beat % 12), beat * 0.25, 'left'))
+      notes.push(note(43 + (beat % 12), beat * 0.25, 'left'))
+    }
+    const s = song({ notes, duration: 4, bpm: 160 })
+    expect(scoreDifficulty(s)).toBeGreaterThan(60)
+  })
+})
+
 describe('difficultyTier', () => {
   it('maps a trivial song to tier 1', () => {
     const s = song({ notes: [note(60, 0), note(62, 1)], duration: 2, bpm: 60 })

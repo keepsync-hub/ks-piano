@@ -1,27 +1,15 @@
-import type { CSSProperties } from 'react'
 import './ProgressHUD.css'
 
 interface ProgressHUDProps {
   level: number
   xpIntoLevel: number
   xpForNextLevel: number
-  todayXp: number
-  dailyGoalXp: number
   dailyGoalMet: boolean
   streakDays: number
 }
 
-export function ProgressHUD({
-  level,
-  xpIntoLevel,
-  xpForNextLevel,
-  todayXp,
-  dailyGoalXp,
-  dailyGoalMet,
-  streakDays,
-}: ProgressHUDProps) {
+export function ProgressHUD({ level, xpIntoLevel, xpForNextLevel, dailyGoalMet, streakDays }: ProgressHUDProps) {
   const levelPct = Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100))
-  const goalPct = Math.min(100, Math.round((todayXp / Math.max(dailyGoalXp, 1)) * 100))
 
   return (
     <div className="progress-hud">
@@ -34,11 +22,9 @@ export function ProgressHUD({
 
       <div
         className={dailyGoalMet ? 'hud-goal hud-goal-met' : 'hud-goal'}
-        title={`Daily goal: ${todayXp}/${dailyGoalXp} XP`}
+        title={dailyGoalMet ? 'Daily goal met — finished a workout session today' : 'Finish a workout session to meet today’s goal'}
       >
-        <span className="hud-goal-ring" style={{ '--goal-pct': `${goalPct}%` } as CSSProperties}>
-          {dailyGoalMet ? '✓' : `${goalPct}%`}
-        </span>
+        <span className="hud-goal-ring">{dailyGoalMet ? '✓' : ''}</span>
         <span className="hud-goal-label">Daily goal</span>
       </div>
 

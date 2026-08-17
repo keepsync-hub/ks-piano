@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useLocalStorage } from './useLocalStorage'
-import { defaultDailyGoalXp, levelForXp, xpForPracticeSeconds, xpForSongResult } from '../piano/xp'
-import type { ProfileType } from '../types'
+import { levelForXp, xpForPracticeSeconds, xpForSongResult } from '../piano/xp'
 
 export interface SongProgress {
   songId: string
@@ -13,32 +12,30 @@ export interface SongProgress {
 
 export interface UserProgress {
   streakDays: number
-  /** Date the daily XP goal was last met; drives the streak, à la Duolingo. */
-  lastGoalMetDate: string | null
+  /** Date a workout session was last completed; drives the streak. */
+  lastWorkoutCompletedDate: string | null
+  /** Number of workout sessions completed per day, keyed by "YYYY-MM-DD". */
+  workoutsByDate: Record<string, number>
   totalPracticeSeconds: number
   totalXp: number
-  dailyGoalXp: number
-  /** XP earned per day, keyed by "YYYY-MM-DD". Only recent days matter in practice. */
-  xpByDate: Record<string, number>
   songs: Record<string, SongProgress>
 }
 
 /** A mastered song that hasn't been played in this long is flagged for review. */
 const REVIEW_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000
 
-function defaultProgress(profileType: ProfileType): UserProgress {
+function defaultProgress(): UserProgress {
   return {
     streakDays: 0,
-    lastGoalMetDate: null,
+    lastWorkoutCompletedDate: null,
+    workoutsByDate: {},
     totalPracticeSeconds: 0,
     totalXp: 0,
-    dailyGoalXp: defaultDailyGoalXp(profileType),
-    xpByDate: {},
     songs: {},
   }
 }
 
-function todayKey(): string {
+export function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
@@ -48,47 +45,45 @@ function yesterdayKey(): string {
   return d.toISOString().slice(0, 10)
 }
 
-/** Adds XP, updates today's tally, and bumps the streak if that clears the daily goal. */
 function applyXp(prev: UserProgress, amount: number): UserProgress {
   if (amount <= 0) return prev
+  return { ...prev, totalXp: prev.totalXp + amount }
+}
 
-  const today = todayKey()
-  const todayXp = (prev.xpByDate[today] ?? 0) + amount
-  const xpByDate = { ...prev.xpByDate, [today]: todayXp }
-
-  let streakDays = prev.streakDays
-  let lastGoalMetDate = prev.lastGoalMetDate
-  if (todayXp >= prev.dailyGoalXp && lastGoalMetDate !== today) {
-    streakDays = lastGoalMetDate === yesterdayKey() ? streakDays + 1 : 1
-    lastGoalMetDate = today
-  }
-
-  return { ...prev, totalXp: prev.totalXp + amount, xpByDate, streakDays, lastGoalMetDate }
+/** 0% errors -> 3 stars, up to 20% errors -> 2 stars, more than 20% errors -> 1 star (only completed runs earn stars at all). */
+function starsForErrorRate(errorRate: number): number {
+  if (errorRate <= 0) return 3
+  if (errorRate <= 0.2) return 2
+  return 1
 }
 
 /**
- * Tracks practice streaks, XP, per-song stats and daily goals for one
- * profile. Persists to localStorage under a key namespaced by profileId, so
- * each profile on the same device keeps independent progress.
+ * Tracks practice streaks, XP, per-song star ratings and daily-goal
+ * completion for one profile. Persists to localStorage under a key
+ * namespaced by profileId, so each profile on the same device keeps
+ * independent progress.
  */
-export function useProgress(profileId: string, profileType: ProfileType = 'adult') {
+export function useProgress(profileId: string) {
   const [progress, setProgress] = useLocalStorage<UserProgress>(
     `ks-piano-progress-${profileId}`,
-    defaultProgress(profileType),
+    defaultProgress(),
   )
 
   const recordPractice = useCallback(
     (seconds: number) => {
-      setProgress((prev) => applyXp({ ...prev, totalPracticeSeconds: prev.totalPracticeSeconds + seconds }, xpForPracticeSeconds(seconds)))
+      setProgress((prev) =>
+        applyXp({ ...prev, totalPracticeSeconds: prev.totalPracticeSeconds + seconds }, xpForPracticeSeconds(seconds)),
+      )
     },
     [setProgress],
   )
 
   const recordSongResult = useCallback(
-    (songId: string, errors: number, completed: boolean) => {
+    (songId: string, errors: number, completed: boolean, totalNotes: number) => {
       setProgress((prev) => {
         const existing = prev.songs[songId]
-        const stars = completed ? (errors === 0 ? 3 : errors <= 3 ? 2 : errors <= 6 ? 1 : 0) : 0
+        const errorRate = totalNotes > 0 ? errors / totalNotes : errors > 0 ? 1 : 0
+        const stars = completed ? starsForErrorRate(errorRate) : 0
         const bestStars = Math.max(existing?.bestStars ?? 0, stars)
         const bestErrors = Math.min(existing?.bestErrors ?? Infinity, errors)
 
@@ -112,12 +107,22 @@ export function useProgress(profileId: string, profileType: ProfileType = 'adult
     [setProgress],
   )
 
-  const setDailyGoalXp = useCallback(
-    (xp: number) => {
-      setProgress((prev) => ({ ...prev, dailyGoalXp: xp }))
-    },
-    [setProgress],
-  )
+  /** Call when a workout session (the "Start 5-Min Workout" flow) finishes, to credit the daily goal and streak. */
+  const recordWorkoutCompleted = useCallback(() => {
+    setProgress((prev) => {
+      const today = todayKey()
+      const workoutsByDate = { ...prev.workoutsByDate, [today]: (prev.workoutsByDate[today] ?? 0) + 1 }
+
+      let streakDays = prev.streakDays
+      let lastWorkoutCompletedDate = prev.lastWorkoutCompletedDate
+      if (lastWorkoutCompletedDate !== today) {
+        streakDays = lastWorkoutCompletedDate === yesterdayKey() ? streakDays + 1 : 1
+        lastWorkoutCompletedDate = today
+      }
+
+      return { ...prev, workoutsByDate, streakDays, lastWorkoutCompletedDate }
+    })
+  }, [setProgress])
 
   const getSongProgress = useCallback(
     (songId: string): SongProgress | undefined => progress.songs[songId],
@@ -135,7 +140,7 @@ export function useProgress(profileId: string, profileType: ProfileType = 'adult
 
   const stats = useMemo(() => {
     const level = levelForXp(progress.totalXp)
-    const todayXp = progress.xpByDate[todayKey()] ?? 0
+    const todayWorkouts = progress.workoutsByDate[todayKey()] ?? 0
     return {
       streakDays: progress.streakDays,
       totalPracticeMinutes: Math.round(progress.totalPracticeSeconds / 60),
@@ -145,11 +150,18 @@ export function useProgress(profileId: string, profileType: ProfileType = 'adult
       level: level.level,
       xpIntoLevel: level.xpIntoLevel,
       xpForNextLevel: level.xpForNextLevel,
-      todayXp,
-      dailyGoalXp: progress.dailyGoalXp,
-      dailyGoalMet: todayXp >= progress.dailyGoalXp,
+      todayWorkouts,
+      dailyGoalMet: todayWorkouts >= 1,
     }
   }, [progress])
 
-  return { progress, recordPractice, recordSongResult, getSongProgress, isDueForReview, setDailyGoalXp, stats }
+  return {
+    progress,
+    recordPractice,
+    recordSongResult,
+    recordWorkoutCompleted,
+    getSongProgress,
+    isDueForReview,
+    stats,
+  }
 }

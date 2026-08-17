@@ -192,6 +192,32 @@
   color: #fff;
 }
 
+.options-toggle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 30px;
+  height: 26px;
+  padding: 0 5px;
+  background: #1c2029;
+  border: 1px solid #2c3140;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.options-toggle:hover {
+  background: #262c38;
+}
+
+.options-toggle span {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: #cfd3de;
+}
+
 .sheet-music-loading {
   flex: 1;
   display: flex;

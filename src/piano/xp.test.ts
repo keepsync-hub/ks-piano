@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DAILY_GOAL_PRESETS, defaultDailyGoalXp, levelForXp, xpForPracticeSeconds, xpForSongResult } from './xp'
+import { levelForXp, xpForPracticeSeconds, xpForSongResult } from './xp'
 
 describe('xpForPracticeSeconds', () => {
   it('awards one XP per ten seconds', () => {
@@ -39,12 +39,5 @@ describe('levelForXp', () => {
     expect(levelForXp(99)).toEqual({ level: 1, xpIntoLevel: 99, xpForNextLevel: 100 })
     expect(levelForXp(100)).toEqual({ level: 2, xpIntoLevel: 0, xpForNextLevel: 100 })
     expect(levelForXp(250)).toEqual({ level: 3, xpIntoLevel: 50, xpForNextLevel: 100 })
-  })
-})
-
-describe('defaultDailyGoalXp', () => {
-  it('gives children the casual goal and adults the regular goal', () => {
-    expect(defaultDailyGoalXp('child')).toBe(DAILY_GOAL_PRESETS[0].xp)
-    expect(defaultDailyGoalXp('adult')).toBe(DAILY_GOAL_PRESETS[1].xp)
   })
 })

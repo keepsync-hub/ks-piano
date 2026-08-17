@@ -6,8 +6,8 @@ import { useProgress } from './hooks/useProgress'
 import { useProfiles } from './hooks/useProfiles'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useWorkout } from './hooks/useWorkout'
-import { DEMO_SONGS } from './midi/demoSongs'
-import { buildSkillPath } from './piano/skillPath'
+import { useDemoSongs } from './hooks/useDemoSongs'
+import { buildProgressMarkdown } from './piano/progressExport'
 import { SongLibrary } from './components/SongLibrary'
 import { PianoKeyboard } from './components/PianoKeyboard'
 import { FallingNotes } from './components/FallingNotes'
@@ -27,9 +27,9 @@ type StageView = 'falling' | 'sheet' | 'both'
 function App() {
   const { profiles, activeProfile, createProfile, selectProfile, clearActiveProfile } = useProfiles()
   const profileId = activeProfile?.id ?? '__none__'
-  const profileType = activeProfile?.type ?? 'adult'
 
-  const { recordSongResult, recordPractice, stats, getSongProgress, isDueForReview } = useProgress(profileId, profileType)
+  const { recordSongResult, recordPractice, recordWorkoutCompleted, stats, getSongProgress, isDueForReview } =
+    useProgress(profileId)
   const [errorFlash, setErrorFlash] = useState<number | null>(null)
   const workoutCompleteRef = useRef<(() => void) | null>(null)
   const workoutNoteRef = useRef<((correct: boolean) => void) | null>(null)
@@ -39,8 +39,8 @@ function App() {
       setErrorFlash(midi)
       window.setTimeout(() => setErrorFlash(null), 300)
     },
-    onSongComplete: (songId, errors) => {
-      recordSongResult(songId, errors, true)
+    onSongComplete: (songId, errors, totalNotes) => {
+      recordSongResult(songId, errors, true, totalNotes)
       recordPractice(engine.song?.duration ?? 0)
       workoutCompleteRef.current?.()
     },
@@ -50,22 +50,29 @@ function App() {
   })
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
 
+  const demoSongs = useDemoSongs()
   const bestStarsFor = useCallback((songId: string) => getSongProgress(songId)?.bestStars ?? 0, [getSongProgress])
-  const unlockedSongs = useMemo(() => {
-    const tiers = buildSkillPath(DEMO_SONGS, bestStarsFor, profileType)
-    return tiers.filter((t) => t.unlocked).flatMap((t) => t.songs)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileType, stats.totalStars])
 
-  const workout = useWorkout(unlockedSongs.length > 0 ? unlockedSongs : DEMO_SONGS, engine.loadSong, engine.setMode)
+  const workout = useWorkout(demoSongs, engine.loadSong, engine.setMode)
   workoutCompleteRef.current = workout.recordSongComplete
   workoutNoteRef.current = workout.recordNote
+
+  // A workout session only counts toward the daily goal and streak once it
+  // runs its full 5 minutes — stopping early doesn't credit either.
+  const lastCreditedWorkoutPhaseRef = useRef(workout.phase)
+  useEffect(() => {
+    if (lastCreditedWorkoutPhaseRef.current !== 'finished' && workout.phase === 'finished') {
+      recordWorkoutCompleted()
+    }
+    lastCreditedWorkoutPhaseRef.current = workout.phase
+  }, [workout.phase, recordWorkoutCompleted])
 
   const [view, setView] = useLocalStorage<StageView>('ks-piano-view', 'falling')
   const [lookaheadSeconds, setLookaheadSeconds] = useLocalStorage('ks-piano-lookahead', 3.5)
   const [showMeasureLines, setShowMeasureLines] = useLocalStorage('ks-piano-measure-lines', true)
   const [showFingering, setShowFingering] = useLocalStorage('ks-piano-fingering', true)
   const [sidebarOpen, setSidebarOpen] = useLocalStorage('ks-piano-sidebar', true)
+  const [optionsOpen, setOptionsOpen] = useState(false)
 
   const { togglePlay, restart, seekBy, setMetronomeEnabled, setLoopStart, setLoopEnd, clearLoop, setFingerForCurrent } =
     engine
@@ -98,12 +105,22 @@ function App() {
   )
   useShortcuts(shortcutHandlers)
 
+  const handleExportProgress = useCallback(() => {
+    const markdown = buildProgressMarkdown(profiles, demoSongs)
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'PROGRESS.md'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [profiles, demoSongs])
+
   useEffect(() => {
     if (!activeProfile) return
-    // Prefer Twinkle Twinkle as a familiar default, but never load a song this
-    // profile hasn't unlocked yet — fall back to whatever tier 1 offers.
-    const preferred = unlockedSongs.find((s) => s.id === 'demo-twinkle')
-    engine.loadSong(preferred ?? unlockedSongs[0] ?? DEMO_SONGS[0])
+    // Prefer Merrily We Roll Along as a familiar first default.
+    const preferred = demoSongs.find((s) => s.id === 'apa-b1-u01-merrily')
+    engine.loadSong(preferred ?? demoSongs[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile])
 
@@ -147,8 +164,6 @@ function App() {
             level={stats.level}
             xpIntoLevel={stats.xpIntoLevel}
             xpForNextLevel={stats.xpForNextLevel}
-            todayXp={stats.todayXp}
-            dailyGoalXp={stats.dailyGoalXp}
             dailyGoalMet={stats.dailyGoalMet}
             streakDays={stats.streakDays}
           />
@@ -172,9 +187,9 @@ function App() {
         {sidebarOpen && (
           <aside className="sidebar">
             <SongLibrary
+              songs={demoSongs}
               currentSongId={engine.song?.id}
               onSelect={engine.loadSong}
-              profileType={activeProfile.type}
               bestStarsFor={bestStarsFor}
               isDueForReview={isDueForReview}
             />
@@ -197,6 +212,17 @@ function App() {
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              className="options-toggle"
+              aria-label={optionsOpen ? 'Hide options menu' : 'Show options menu'}
+              aria-expanded={optionsOpen}
+              onClick={() => setOptionsOpen((v) => !v)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
           </div>
 
           {view === 'falling' && <FallingNotes {...fallingProps} />}
@@ -256,6 +282,9 @@ function App() {
             onNextSong={workout.nextSong}
           />
           <PracticeToolbar
+            open={optionsOpen}
+            onClose={() => setOptionsOpen(false)}
+            onExportProgress={handleExportProgress}
             handFilter={engine.handFilter}
             onHandFilterChange={engine.setHandFilter}
             mixer={engine.mixer}

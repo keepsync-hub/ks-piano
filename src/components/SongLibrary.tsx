@@ -1,27 +1,44 @@
 import { useMemo, useRef, useState } from 'react'
-import type { ProfileType, Song } from '../types'
-import { DEMO_SONGS } from '../midi/demoSongs'
+import type { Song } from '../types'
 import { parseMidiFile } from '../midi/parser'
-import { buildSkillPath } from '../piano/skillPath'
 import './SongLibrary.css'
 
 interface SongLibraryProps {
+  songs: Song[]
   currentSongId: string | undefined
   onSelect: (song: Song) => void
-  profileType: ProfileType
   bestStarsFor: (songId: string) => number
   isDueForReview: (songId: string) => boolean
 }
 
-export function SongLibrary({ currentSongId, onSelect, profileType, bestStarsFor, isDueForReview }: SongLibraryProps) {
+/** Pulls the hymn number out of "Himnario y Cánticos — Himno 001"-style composer credits, if present. */
+function hymnNumberOf(song: Song): string | null {
+  const match = song.composer?.match(/Himno\s+(\d+)/i)
+  return match ? match[1] : null
+}
+
+function matchesQuery(song: Song, query: string): boolean {
+  if (!query) return true
+  if (song.title.toLowerCase().includes(query)) return true
+  const number = hymnNumberOf(song)
+  if (!number) return false
+  const normalizedNumber = number.replace(/^0+(?=\d)/, '')
+  const normalizedQuery = query.replace(/^0+(?=\d)/, '')
+  return number === normalizedQuery || normalizedNumber === normalizedQuery
+}
+
+export function SongLibrary({ songs, currentSongId, onSelect, bestStarsFor, isDueForReview }: SongLibraryProps) {
   const [uploaded, setUploaded] = useState<Song[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const tiers = useMemo(
-    () => buildSkillPath(DEMO_SONGS, bestStarsFor, profileType),
-    [bestStarsFor, profileType],
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredUploads = useMemo(
+    () => uploaded.filter((s) => matchesQuery(s, normalizedQuery)),
+    [uploaded, normalizedQuery],
   )
+  const filteredSongs = useMemo(() => songs.filter((s) => matchesQuery(s, normalizedQuery)), [songs, normalizedQuery])
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -56,44 +73,45 @@ export function SongLibrary({ currentSongId, onSelect, profileType, bestStarsFor
           onChange={(e) => handleFiles(e.target.files)}
         />
       </div>
+      <div className="song-search">
+        <input
+          type="search"
+          className="song-search-input"
+          placeholder="Search by name or hymn number…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search hymns by name or number"
+        />
+      </div>
       {error && <p className="song-library-error">{error}</p>}
       <ul className="song-list">
-        {uploaded.length > 0 && <li className="song-list-group">Your uploads</li>}
-        {uploaded.map((song) => (
+        {filteredUploads.length > 0 && <li className="song-list-group">Your uploads</li>}
+        {filteredUploads.map((song) => (
           <SongRow
             key={song.id}
             song={song}
             active={song.id === currentSongId}
-            locked={false}
             bestStars={bestStarsFor(song.id)}
             dueForReview={isDueForReview(song.id)}
             onSelect={onSelect}
           />
         ))}
 
-        {tiers.map((tier) => (
-          <li key={tier.tier} className="song-tier">
-            <div className="song-list-group song-tier-header">
-              <span>
-                Tier {tier.tier} · {tier.label}
-              </span>
-              {!tier.unlocked && <span className="song-tier-lock" title="Master the previous tier to unlock">🔒</span>}
-            </div>
-            <ul className="song-tier-songs">
-              {tier.songs.map((song) => (
-                <SongRow
-                  key={song.id}
-                  song={song}
-                  active={song.id === currentSongId}
-                  locked={!tier.unlocked}
-                  bestStars={bestStarsFor(song.id)}
-                  dueForReview={isDueForReview(song.id)}
-                  onSelect={onSelect}
-                />
-              ))}
-            </ul>
-          </li>
+        {filteredSongs.length > 0 && <li className="song-list-group">Hymns</li>}
+        {filteredSongs.map((song) => (
+          <SongRow
+            key={song.id}
+            song={song}
+            active={song.id === currentSongId}
+            bestStars={bestStarsFor(song.id)}
+            dueForReview={isDueForReview(song.id)}
+            onSelect={onSelect}
+          />
         ))}
+
+        {filteredUploads.length === 0 && filteredSongs.length === 0 && (
+          <li className="song-list-empty">No hymns match “{query}”.</li>
+        )}
       </ul>
     </div>
   )
@@ -102,41 +120,27 @@ export function SongLibrary({ currentSongId, onSelect, profileType, bestStarsFor
 interface SongRowProps {
   song: Song
   active: boolean
-  locked: boolean
   bestStars: number
   dueForReview: boolean
   onSelect: (s: Song) => void
 }
 
-function SongRow({ song, active, locked, bestStars, dueForReview, onSelect }: SongRowProps) {
-  const className = [
-    'song-row',
-    active ? 'song-row-active' : '',
-    locked ? 'song-row-locked' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+function SongRow({ song, active, bestStars, dueForReview, onSelect }: SongRowProps) {
+  const className = ['song-row', active ? 'song-row-active' : ''].filter(Boolean).join(' ')
 
   return (
     <li>
-      <button
-        type="button"
-        className={className}
-        onClick={() => !locked && onSelect(song)}
-        disabled={locked}
-        title={locked ? 'Locked — practise the previous tier first' : undefined}
-      >
+      <button type="button" className={className} onClick={() => onSelect(song)}>
         <span className="song-row-top">
           <span className="song-title">{song.title}</span>
-          {locked && <span className="song-lock-icon">🔒</span>}
-          {!locked && dueForReview && (
+          {dueForReview && (
             <span className="song-review-badge" title="It's been a few days — worth a replay">
               🔁
             </span>
           )}
         </span>
         {song.composer && <span className="song-composer">{song.composer}</span>}
-        {!locked && bestStars > 0 && (
+        {bestStars > 0 && (
           <span className="song-stars" aria-hidden="true">
             {'★'.repeat(bestStars)}
             {'☆'.repeat(3 - bestStars)}
