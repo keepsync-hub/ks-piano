@@ -32,6 +32,14 @@ export type ScoreElement = ScoreNoteElement | ScoreRestElement
 export interface ScoreMeasure {
   treble: ScoreElement[]
   bass: ScoreElement[]
+  /**
+   * A second, independent voice sharing the treble/bass stave — set only
+   * when the song's notes carry an explicit `voice: 1` (e.g. SATB parts:
+   * alto under soprano, bass under tenor). Undefined means the stave has
+   * just the one voice above.
+   */
+  trebleVoice2?: ScoreElement[]
+  bassVoice2?: ScoreElement[]
 }
 
 export interface ScoreLayout {
@@ -259,27 +267,37 @@ export function buildScore(song: Song): ScoreLayout {
           durUnits: Math.round(n.duration / secondsPerUnit),
         }
 
-  const trebleEvents = quantizeHandEvents(
-    song.notes.filter((n) => n.hand === 'right'),
-    toUnits,
-    unitsPerMeasure,
-  )
-  const bassEvents = quantizeHandEvents(
-    song.notes.filter((n) => n.hand === 'left'),
-    toUnits,
-    unitsPerMeasure,
-  )
+  const trebleNotes = song.notes.filter((n) => n.hand === 'right')
+  const bassNotes = song.notes.filter((n) => n.hand === 'left')
+  // Voice 1 (e.g. alto/bass) only exists as a separate stream when the song
+  // actually marks notes that way — otherwise every note on the stave stays
+  // in the single primary voice, exactly like before SATB support existed.
+  const trebleEvents = quantizeHandEvents(trebleNotes.filter((n) => n.voice !== 1), toUnits, unitsPerMeasure)
+  const trebleEvents2 = quantizeHandEvents(trebleNotes.filter((n) => n.voice === 1), toUnits, unitsPerMeasure)
+  const bassEvents = quantizeHandEvents(bassNotes.filter((n) => n.voice !== 1), toUnits, unitsPerMeasure)
+  const bassEvents2 = quantizeHandEvents(bassNotes.filter((n) => n.voice === 1), toUnits, unitsPerMeasure)
 
   const maxEndUnit = Math.max(
     0,
     ...trebleEvents.map((e) => e.startUnit + e.durUnits),
+    ...trebleEvents2.map((e) => e.startUnit + e.durUnits),
     ...bassEvents.map((e) => e.startUnit + e.durUnits),
+    ...bassEvents2.map((e) => e.startUnit + e.durUnits),
   )
   const measureCount = Math.max(1, Math.ceil(maxEndUnit / unitsPerMeasure))
 
   const trebleMeasures = layoutHandMeasures(trebleEvents, measureCount, unitsPerMeasure)
+  const trebleMeasures2 = layoutHandMeasures(trebleEvents2, measureCount, unitsPerMeasure)
   const bassMeasures = layoutHandMeasures(bassEvents, measureCount, unitsPerMeasure)
-  const measures: ScoreMeasure[] = trebleMeasures.map((treble, i) => ({ treble, bass: bassMeasures[i] }))
+  const bassMeasures2 = layoutHandMeasures(bassEvents2, measureCount, unitsPerMeasure)
+  const hasTrebleVoice2 = trebleEvents2.length > 0
+  const hasBassVoice2 = bassEvents2.length > 0
+  const measures: ScoreMeasure[] = trebleMeasures.map((treble, i) => ({
+    treble,
+    bass: bassMeasures[i],
+    trebleVoice2: hasTrebleVoice2 ? trebleMeasures2[i] : undefined,
+    bassVoice2: hasBassVoice2 ? bassMeasures2[i] : undefined,
+  }))
 
   const ticksToSeconds = ppq ? makeTicksToSeconds(ppq, song.tempoEvents ?? []) : null
   const measureStartSeconds: number[] = []

@@ -23,9 +23,51 @@ describe('keySignatureToVexSpec', () => {
   })
 })
 
-function note(midi: number, time: number, hand: NoteEvent['hand'] = 'right'): NoteEvent {
-  return { midi, time, duration: 0.4, velocity: 0.8, hand }
+function note(midi: number, time: number, hand: NoteEvent['hand'] = 'right', voice?: 0 | 1): NoteEvent {
+  return { midi, time, duration: 0.4, velocity: 0.8, hand, voice }
 }
+
+describe('buildScore SATB voices', () => {
+  it('keeps a single-voice stave when no note declares voice 1, unchanged from before', () => {
+    const song: Song = {
+      id: 's',
+      title: 't',
+      bpm: 120,
+      duration: 2,
+      notes: [note(60, 0, 'right'), note(48, 0, 'left')],
+    }
+    const score = buildScore(song)
+    expect(score.measures[0].trebleVoice2).toBeUndefined()
+    expect(score.measures[0].bassVoice2).toBeUndefined()
+  })
+
+  it('splits a stave with voice-1 notes (e.g. SATB alto/bass) into a second voice', () => {
+    const song: Song = {
+      id: 's',
+      title: 't',
+      bpm: 120,
+      duration: 2,
+      notes: [
+        note(76, 0, 'right', 0), // soprano
+        note(69, 0, 'right', 1), // alto
+        note(64, 0, 'left', 0), // tenor
+        note(43, 0, 'left', 1), // bass
+      ],
+    }
+    const score = buildScore(song)
+    const measure = score.measures[0]
+
+    const sopranoNote = measure.treble.find((el) => el.kind === 'note')
+    const altoNote = measure.trebleVoice2?.find((el) => el.kind === 'note')
+    const tenorNote = measure.bass.find((el) => el.kind === 'note')
+    const bassNote = measure.bassVoice2?.find((el) => el.kind === 'note')
+
+    expect(sopranoNote?.kind === 'note' && sopranoNote.keys).toEqual(['e/5'])
+    expect(altoNote?.kind === 'note' && altoNote.keys).toEqual(['a/4'])
+    expect(tenorNote?.kind === 'note' && tenorNote.keys).toEqual(['e/4'])
+    expect(bassNote?.kind === 'note' && bassNote.keys).toEqual(['g/2'])
+  })
+})
 
 describe('buildScore key signature', () => {
   it('carries the song key signature through as a VexFlow spec', () => {

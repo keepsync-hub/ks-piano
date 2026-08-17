@@ -54,7 +54,12 @@ interface HighlightEntry {
   refs: NoteEvent[]
 }
 
-function buildVexNote(el: ScoreElement, clef: 'treble' | 'bass', showFingering: boolean): StaveNote {
+function buildVexNote(
+  el: ScoreElement,
+  clef: 'treble' | 'bass',
+  showFingering: boolean,
+  stemDirection?: 1 | -1,
+): StaveNote {
   if (el.kind === 'rest') {
     const rest = new StaveNote({
       keys: [clef === 'treble' ? 'b/4' : 'd/3'],
@@ -66,6 +71,9 @@ function buildVexNote(el: ScoreElement, clef: 'treble' | 'bass', showFingering: 
   }
   const note = new StaveNote({ keys: el.keys, duration: el.vfDuration, clef })
   if (el.dots) Dot.buildAndAttach([note], { all: true })
+  // Forced only when a second voice shares this stave (e.g. SATB alto under
+  // soprano) — a single voice keeps VexFlow's pitch-based default stemming.
+  if (stemDirection) note.setStemDirection(stemDirection)
   // Accidentals aren't attached here — Accidental.applyAccidentals() decides
   // per-note, per-measure, against the key signature (see the build effect).
   if (showFingering) {
@@ -188,8 +196,16 @@ export function SheetMusic({ song, time, showFingering = false }: SheetMusicProp
       // room they actually need. Sizing from a glyph count instead would let
       // dense measures (or fingering marks) overflow their barlines.
       const built = score.measures.map((measure) => {
-        const trebleNotes = measure.treble.map((el) => buildVexNote(el, 'treble', showFingering))
-        const bassNotes = measure.bass.map((el) => buildVexNote(el, 'bass', showFingering))
+        // A second voice sharing a stave (SATB alto/bass under soprano/tenor)
+        // forces both voices' stems apart — soprano/tenor up, alto/bass down
+        // — instead of VexFlow's pitch-based default, which is how hymn
+        // scores read even when the two voices' noteheads sit close together.
+        const hasTrebleVoice2 = !!measure.trebleVoice2
+        const hasBassVoice2 = !!measure.bassVoice2
+        const trebleNotes = measure.treble.map((el) => buildVexNote(el, 'treble', showFingering, hasTrebleVoice2 ? 1 : undefined))
+        const trebleNotes2 = (measure.trebleVoice2 ?? []).map((el) => buildVexNote(el, 'treble', showFingering, -1))
+        const bassNotes = measure.bass.map((el) => buildVexNote(el, 'bass', showFingering, hasBassVoice2 ? 1 : undefined))
+        const bassNotes2 = (measure.bassVoice2 ?? []).map((el) => buildVexNote(el, 'bass', showFingering, -1))
         const voices: Voice[] = []
         const makeVoice = (notes: StaveNote[]) => {
           const voice = new Voice({
@@ -200,22 +216,41 @@ export function SheetMusic({ song, time, showFingering = false }: SheetMusicProp
           return voice
         }
         const trebleVoice = trebleNotes.length ? makeVoice(trebleNotes) : null
+        const trebleVoice2 = trebleNotes2.length ? makeVoice(trebleNotes2) : null
         const bassVoice = bassNotes.length ? makeVoice(bassNotes) : null
+        const bassVoice2 = bassNotes2.length ? makeVoice(bassNotes2) : null
         // Resolves accidentals against the key signature — before any width
         // measurement, since a sharp/flat/natural changes how much room a
-        // note needs. Applied per hand so treble and bass never share
-        // carry-over, and per measure (fresh voices each time) so it resets
-        // at the barline like real notation.
-        if (trebleVoice) Accidental.applyAccidentals([trebleVoice], score.keySpec)
-        if (bassVoice) Accidental.applyAccidentals([bassVoice], score.keySpec)
-        if (trebleVoice) voices.push(trebleVoice)
-        if (bassVoice) voices.push(bassVoice)
+        // note needs. Applied per stave (both its voices together, so alto
+        // doesn't restate a sharp soprano already established) and per
+        // measure (fresh voices each time) so it resets at the barline like
+        // real notation.
+        const trebleVoices = [trebleVoice, trebleVoice2].filter((v): v is Voice => !!v)
+        const bassVoices = [bassVoice, bassVoice2].filter((v): v is Voice => !!v)
+        if (trebleVoices.length) Accidental.applyAccidentals(trebleVoices, score.keySpec)
+        if (bassVoices.length) Accidental.applyAccidentals(bassVoices, score.keySpec)
+        voices.push(...trebleVoices, ...bassVoices)
 
-        // One formatter across both staves keeps the hands vertically aligned.
+        // One formatter across both staves keeps the hands vertically
+        // aligned; voices sharing a stave are joined together so their
+        // notes line up in time against each other too.
         const formatter = new Formatter()
-        for (const voice of voices) formatter.joinVoices([voice])
+        if (trebleVoices.length) formatter.joinVoices(trebleVoices)
+        if (bassVoices.length) formatter.joinVoices(bassVoices)
         const minWidth = voices.length ? formatter.preCalculateMinTotalWidth(voices) : MEASURE_MIN_WIDTH
-        return { trebleNotes, bassNotes, trebleVoice, bassVoice, voices, formatter, minWidth }
+        return {
+          trebleNotes,
+          trebleNotes2,
+          bassNotes,
+          bassNotes2,
+          trebleVoice,
+          trebleVoice2,
+          bassVoice,
+          bassVoice2,
+          voices,
+          formatter,
+          minWidth,
+        }
       })
 
       const widths = built.map((b) => Math.max(MEASURE_MIN_WIDTH, Math.ceil(b.minWidth) + MEASURE_PADDING))
@@ -244,14 +279,18 @@ export function SheetMusic({ song, time, showFingering = false }: SheetMusicProp
         bass.setContext(context).draw()
 
         b.trebleVoice?.setStave(treble)
+        b.trebleVoice2?.setStave(treble)
         b.bassVoice?.setStave(bass)
+        b.bassVoice2?.setStave(bass)
         if (b.voices.length) {
           b.formatter.format(b.voices, Math.max(20, width - MEASURE_PADDING))
         }
 
         for (const [staveEls, stave, vexNotes, voice] of [
           [measure.treble, treble, b.trebleNotes, b.trebleVoice],
+          [measure.trebleVoice2 ?? [], treble, b.trebleNotes2, b.trebleVoice2],
           [measure.bass, bass, b.bassNotes, b.bassVoice],
+          [measure.bassVoice2 ?? [], bass, b.bassNotes2, b.bassVoice2],
         ] as const) {
           if (!voice || staveEls.length === 0) continue
 
