@@ -184,6 +184,27 @@ writeSong({
 })
 
 writeSong({
+  id: 'unit02-mary-had-a-little-lamb',
+  title: 'Mary Had a Little Lamb',
+  composer: 'Tradicional',
+  bpm: 76,
+  beatNotes: [
+    { note: 'E4', beat: 0, beats: 1, hand: 'right' }, { note: 'D4', beat: 1, beats: 1, hand: 'right' },
+    { note: 'C4', beat: 2, beats: 1, hand: 'right' }, { note: 'D4', beat: 3, beats: 1, hand: 'right' },
+    { note: 'E4', beat: 4, beats: 1, hand: 'right' }, { note: 'E4', beat: 5, beats: 1, hand: 'right' }, { note: 'E4', beat: 6, beats: 2, hand: 'right' },
+    { note: 'D4', beat: 8, beats: 1, hand: 'right' }, { note: 'D4', beat: 9, beats: 1, hand: 'right' }, { note: 'D4', beat: 10, beats: 2, hand: 'right' },
+    { note: 'E4', beat: 12, beats: 1, hand: 'right' }, { note: 'G4', beat: 13, beats: 1, hand: 'right' }, { note: 'G4', beat: 14, beats: 2, hand: 'right' },
+    { note: 'E4', beat: 16, beats: 1, hand: 'right' }, { note: 'D4', beat: 17, beats: 1, hand: 'right' },
+    { note: 'C4', beat: 18, beats: 1, hand: 'right' }, { note: 'D4', beat: 19, beats: 1, hand: 'right' },
+    { note: 'E4', beat: 20, beats: 1, hand: 'right' }, { note: 'E4', beat: 21, beats: 1, hand: 'right' },
+    { note: 'E4', beat: 22, beats: 1, hand: 'right' }, { note: 'E4', beat: 23, beats: 1, hand: 'right' },
+    { note: 'D4', beat: 24, beats: 1, hand: 'right' }, { note: 'D4', beat: 25, beats: 1, hand: 'right' },
+    { note: 'E4', beat: 26, beats: 1, hand: 'right' }, { note: 'D4', beat: 27, beats: 1, hand: 'right' },
+    { note: 'C4', beat: 28, beats: 4, hand: 'right' },
+  ],
+})
+
+writeSong({
   id: 'unit02-row-row-row-your-boat',
   title: 'Row, Row, Row Your Boat',
   composer: 'Tradicional',
@@ -205,6 +226,25 @@ writeSong({
 })
 
 writeSong({
+  id: 'unit03-twinkle-twinkle-little-star',
+  title: 'Twinkle Twinkle Little Star',
+  composer: 'Tradicional',
+  bpm: 100,
+  beatNotes: [
+    { note: 'C4', beat: 0, beats: 1, hand: 'right' }, { note: 'C4', beat: 1, beats: 1, hand: 'right' },
+    { note: 'G4', beat: 2, beats: 1, hand: 'right' }, { note: 'G4', beat: 3, beats: 1, hand: 'right' },
+    { note: 'A4', beat: 4, beats: 1, hand: 'right' }, { note: 'A4', beat: 5, beats: 1, hand: 'right' }, { note: 'G4', beat: 6, beats: 2, hand: 'right' },
+    { note: 'F4', beat: 8, beats: 1, hand: 'right' }, { note: 'F4', beat: 9, beats: 1, hand: 'right' },
+    { note: 'E4', beat: 10, beats: 1, hand: 'right' }, { note: 'E4', beat: 11, beats: 1, hand: 'right' },
+    { note: 'D4', beat: 12, beats: 1, hand: 'right' }, { note: 'D4', beat: 13, beats: 1, hand: 'right' }, { note: 'C4', beat: 14, beats: 2, hand: 'right' },
+    { note: 'C3', beat: 0, beats: 2, hand: 'left' }, { note: 'G2', beat: 2, beats: 2, hand: 'left' },
+    { note: 'A2', beat: 4, beats: 2, hand: 'left' }, { note: 'F2', beat: 6, beats: 2, hand: 'left' },
+    { note: 'F2', beat: 8, beats: 2, hand: 'left' }, { note: 'C3', beat: 10, beats: 2, hand: 'left' },
+    { note: 'G2', beat: 12, beats: 2, hand: 'left' }, { note: 'C3', beat: 14, beats: 2, hand: 'left' },
+  ],
+})
+
+writeSong({
   id: 'unit04-hot-cross-buns',
   title: 'Hot Cross Buns',
   composer: 'Tradicional',
@@ -218,6 +258,25 @@ writeSong({
     { note: 'D4', beat: 11, beats: 0.5, hand: 'right' }, { note: 'D4', beat: 11.5, beats: 0.5, hand: 'right' },
     { note: 'E4', beat: 12, beats: 1, hand: 'right' }, { note: 'D4', beat: 13, beats: 1, hand: 'right' }, { note: 'C4', beat: 14, beats: 2, hand: 'right' },
     { note: 'C3', beat: 0, beats: 8, hand: 'left' }, { note: 'G2', beat: 8, beats: 4, hand: 'left' }, { note: 'C3', beat: 12, beats: 4, hand: 'left' },
+  ],
+})
+
+writeSong({
+  id: 'unit04-ode-to-joy',
+  title: 'Ode to Joy (theme)',
+  composer: 'Beethoven',
+  bpm: 112,
+  beatNotes: [
+    { note: 'E4', beat: 0, beats: 1, hand: 'right' }, { note: 'E4', beat: 1, beats: 1, hand: 'right' },
+    { note: 'F4', beat: 2, beats: 1, hand: 'right' }, { note: 'G4', beat: 3, beats: 1, hand: 'right' },
+    { note: 'G4', beat: 4, beats: 1, hand: 'right' }, { note: 'F4', beat: 5, beats: 1, hand: 'right' },
+    { note: 'E4', beat: 6, beats: 1, hand: 'right' }, { note: 'D4', beat: 7, beats: 1, hand: 'right' },
+    { note: 'C4', beat: 8, beats: 1, hand: 'right' }, { note: 'C4', beat: 9, beats: 1, hand: 'right' },
+    { note: 'D4', beat: 10, beats: 1, hand: 'right' }, { note: 'E4', beat: 11, beats: 1, hand: 'right' },
+    { note: 'E4', beat: 12, beats: 1.5, hand: 'right' }, { note: 'D4', beat: 13.5, beats: 0.5, hand: 'right' },
+    { note: 'D4', beat: 14, beats: 2, hand: 'right' },
+    { note: 'C3', beat: 0, beats: 4, hand: 'left' }, { note: 'G2', beat: 4, beats: 4, hand: 'left' },
+    { note: 'C3', beat: 8, beats: 4, hand: 'left' }, { note: 'G2', beat: 12, beats: 4, hand: 'left' },
   ],
 })
 
@@ -285,6 +344,33 @@ writeSong({
     { note: 'E4', beat: 7, beats: 1, hand: 'right' }, { note: 'D4', beat: 8, beats: 3, hand: 'right' },
     { note: 'D3', beat: 0, beats: 5, hand: 'left' }, { note: 'A2', beat: 5, beats: 3, hand: 'left' }, { note: 'D3', beat: 8, beats: 3, hand: 'left' },
   ],
+})
+
+// Original technical exercise: fast two-hand broken chords across a wide
+// range, with real left-hand chords — not a real piece, just practice for
+// unit 12's sus4 chords and arpeggiated accompaniment.
+const arpeggioBeatNotes = []
+const arpeggioPattern = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'E5', 'C5']
+const arpeggioBassChords = [
+  ['C3', 'G3'],
+  ['A2', 'E3'],
+  ['F2', 'C3'],
+  ['G2', 'D3'],
+]
+for (let bar = 0; bar < 4; bar++) {
+  arpeggioPattern.forEach((note, i) => {
+    arpeggioBeatNotes.push({ note, beat: bar * 4 + i * 0.5, beats: 0.5, hand: 'right' })
+  })
+  const [low, high] = arpeggioBassChords[bar % arpeggioBassChords.length]
+  arpeggioBeatNotes.push({ note: low, beat: bar * 4, beats: 4, hand: 'left' })
+  arpeggioBeatNotes.push({ note: high, beat: bar * 4, beats: 4, hand: 'left' })
+}
+writeSong({
+  id: 'unit12-arpeggio-etude',
+  title: 'Two-Hand Arpeggio Étude',
+  composer: 'Ejercicio original',
+  bpm: 132,
+  beatNotes: arpeggioBeatNotes,
 })
 
 writeSong({
