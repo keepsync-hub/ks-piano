@@ -101,15 +101,38 @@
 .key-on-error {
   --key-color: #ff4444;
 }
+.key-on-success {
+  --key-color: #3ee888;
+}
 
 /* Error flash animation */
 .key-on-error .key-dot {
   animation: error-pulse 0.3s ease-out;
 }
 
+/* Correct-hit flash: a quick happy bounce, distinct from the error pulse's sharp snap. */
+.key-on-success .key-dot {
+  animation: success-pulse 0.3s var(--ease-bounce);
+}
+
 @keyframes error-pulse {
   0% {
     transform: scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes success-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.6);
     opacity: 1;
   }
   100% {

@@ -142,8 +142,9 @@ function SongRow({ song, active, bestStars, dueForReview, onSelect }: SongRowPro
         {song.composer && <span className="song-composer">{song.composer}</span>}
         {bestStars > 0 && (
           <span className="song-stars" aria-hidden="true">
-            {'★'.repeat(bestStars)}
-            {'☆'.repeat(3 - bestStars)}
+            {Array.from({ length: 3 }, (_, i) => (
+              <span key={i}>{i < bestStars ? '★' : '☆'}</span>
+            ))}
           </span>
         )}
       </button>

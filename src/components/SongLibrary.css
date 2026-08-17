@@ -17,22 +17,26 @@
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #8a90a2;
+  color: var(--text-muted);
   margin: 0;
 }
 
 .upload-btn {
-  background: #1f2430;
-  border: 1px solid #333a4a;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   color: #dfe3ee;
   font-size: 12px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .upload-btn:hover {
-  background: #2a3140;
+  background: var(--bg-panel-hover);
+  border-color: var(--brand);
 }
 
 .song-search {
@@ -43,20 +47,21 @@
   width: 100%;
   box-sizing: border-box;
   background: #14161d;
-  border: 1px solid #2c3140;
-  color: #e6e8ee;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
   padding: 7px 10px;
   font-size: 12.5px;
+  transition: border-color 0.15s;
 }
 
 .song-search-input:focus {
   outline: none;
-  border-color: #4a76ef;
+  border-color: var(--brand);
 }
 
 .song-search-input::placeholder {
-  color: #6a7080;
+  color: var(--text-faint);
 }
 
 .song-library-error {
@@ -95,20 +100,26 @@
   align-items: flex-start;
   gap: 2px;
   background: transparent;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   color: #cfd3de;
   padding: 8px 10px;
   cursor: pointer;
   text-align: left;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.12s var(--ease-out);
 }
 
 .song-row:hover {
-  background: #1a1e28;
+  background: var(--bg-panel);
+  transform: translateX(2px);
 }
 
 .song-row-active {
-  background: #23324a;
+  background: rgba(124, 92, 255, 0.16);
+  border-color: var(--brand);
   color: #fff;
 }
 
@@ -119,7 +130,7 @@
 
 .song-composer {
   font-size: 11px;
-  color: #8a90a2;
+  color: var(--text-muted);
 }
 
 .song-row-top {
@@ -132,10 +143,24 @@
 .song-review-badge {
   font-size: 11px;
   margin-left: auto;
+  animation: pop-in 0.4s var(--ease-bounce);
 }
 
 .song-stars {
   font-size: 11px;
-  color: #ffb84d;
+  color: var(--gold);
   letter-spacing: 1px;
+}
+
+.song-stars span {
+  display: inline-block;
+  animation: pop-in 0.35s var(--ease-bounce) backwards;
+}
+
+.song-stars span:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.song-stars span:nth-child(3) {
+  animation-delay: 0.1s;
 }

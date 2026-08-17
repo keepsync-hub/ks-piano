@@ -1,4 +1,5 @@
 import type { WorkoutPhase, WorkoutStats } from '../hooks/useWorkout'
+import { Confetti } from './Confetti'
 import './WorkoutPanel.css'
 
 interface WorkoutPanelProps {
@@ -24,22 +25,23 @@ export function WorkoutPanel({ phase, timeLeft, stats, onStart, onStop, onNextSo
   if (phase === 'finished') {
     return (
       <div className="workout-panel workout-panel-finished">
+        <Confetti />
         <div className="workout-summary">
           <h3>Workout Complete! 🎉</h3>
           <div className="workout-stats">
-            <div className="workout-stat">
+            <div className="workout-stat" style={{ animationDelay: '0s' }}>
               <span className="workout-stat-value">{stats.notesPlayed}</span>
               <span className="workout-stat-label">Notes</span>
             </div>
-            <div className="workout-stat">
+            <div className="workout-stat" style={{ animationDelay: '0.06s' }}>
               <span className="workout-stat-value">{stats.errors}</span>
               <span className="workout-stat-label">Errors</span>
             </div>
-            <div className="workout-stat">
+            <div className="workout-stat" style={{ animationDelay: '0.12s' }}>
               <span className="workout-stat-value">{stats.accuracy}%</span>
               <span className="workout-stat-label">Accuracy</span>
             </div>
-            <div className="workout-stat">
+            <div className="workout-stat" style={{ animationDelay: '0.18s' }}>
               <span className="workout-stat-value">{stats.songsCompleted}</span>
               <span className="workout-stat-label">Songs</span>
             </div>

@@ -16,13 +16,13 @@
   align-items: stretch;
   gap: 14px;
   padding: 16px;
-  background: #12141a;
-  border-left: 1px solid #23262f;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border-soft);
   box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
   font-size: 12px;
   overflow-y: auto;
   transform: translateX(100%);
-  transition: transform 0.25s ease;
+  transition: transform 0.25s var(--ease-out);
   z-index: 40;
 }
 
@@ -35,30 +35,31 @@
   align-items: center;
   justify-content: space-between;
   padding-bottom: 4px;
-  border-bottom: 1px solid #23262f;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .toolbar-drawer-title {
   font-size: 13px;
-  font-weight: 600;
-  color: #e6e8ee;
+  font-weight: 700;
+  color: var(--text);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .toolbar-close-btn {
-  background: #1c2029;
-  border: 1px solid #2c3140;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   color: #cfd3de;
   width: 26px;
   height: 26px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 12px;
+  transition: background 0.15s;
 }
 
 .toolbar-close-btn:hover {
-  background: #262c38;
+  background: var(--bg-panel-hover);
 }
 
 .tool-group {
@@ -78,22 +79,23 @@
 }
 
 .tool-btn {
-  background: #1c2029;
-  border: 1px solid #2c3140;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   color: #cfd3de;
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
+  transition: background 0.15s;
 }
 
 .tool-btn:hover {
-  background: #262c38;
+  background: var(--bg-panel-hover);
 }
 
 .tool-btn-active {
-  background: #2c3446;
-  border-color: #3f4c66;
+  background: var(--brand);
+  border-color: var(--brand-light);
   color: #fff;
 }
 
@@ -106,7 +108,7 @@
 }
 
 .tool-check input {
-  accent-color: #4a90d9;
+  accent-color: var(--brand);
   margin: 0;
 }
 
@@ -125,7 +127,7 @@
 
 .tool-group input[type='range'] {
   width: 92px;
-  accent-color: #4a90d9;
+  accent-color: var(--brand);
 }
 
 .tool-countin {
@@ -135,7 +137,7 @@
   min-width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #ffb84d;
+  background: var(--gold);
   color: #14161b;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
