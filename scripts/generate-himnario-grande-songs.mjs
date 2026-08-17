@@ -11,6 +11,11 @@
 // behaves identically to uploading the same file by hand. The SATB
 // part-name → clef/voice rule below mirrors src/midi/parser.ts's
 // matchSatbPart(); keep the two in sync if that logic changes.
+//
+// A source file is skipped (not fatal) when it has a genuine mid-piece
+// tempo change (toSong() below assumes one bpm for the whole song) or when
+// its track names don't match the expected SATB labels — see
+// SkippedHymnError below for both cases.
 import pkg from '@tonejs/midi'
 const { Midi } = pkg
 import { parseMidi } from 'midi-file'
@@ -36,6 +41,14 @@ const SATB_PARTS = [
 function matchSatbPart(trackName) {
   if (!trackName) return null
   return SATB_PARTS.find((p) => p.regex.test(trackName)) ?? null
+}
+
+/** Thrown for a source file this generator can't handle yet — caller skips it and keeps going. */
+class SkippedHymnError extends Error {
+  constructor(filePath, reason) {
+    super(`${filePath}: ${reason} — skipping`)
+    this.filePath = filePath
+  }
 }
 
 /** Derives a display title from the hymn's first line of lyrics, e.g. "1. Loor te rendimos, /..." -> "Loor te rendimos". */
@@ -64,7 +77,7 @@ function buildRawSong(filePath, hymnNumber) {
   const satbParts = tracksWithNotes.map((t) => matchSatbPart(t.name))
   const useSatb = tracksWithNotes.length >= 2 && satbParts.every((p) => p !== null) && new Set(satbParts).size === satbParts.length
   if (!useSatb) {
-    throw new Error(`${filePath}: expected SATB-named tracks (Soprano/Alto/Tenor/Bass), got [${tracksWithNotes.map((t) => t.name).join(', ')}]`)
+    throw new SkippedHymnError(filePath, `expected SATB-named tracks (Soprano/Alto/Tenor/Bass), got [${tracksWithNotes.map((t) => t.name).join(', ')}]`)
   }
 
   const notes = []
@@ -80,10 +93,12 @@ function buildRawSong(filePath, hymnNumber) {
   const bpm = midi.header.tempos[0]?.bpm ?? 120
   // Cantiquest exports repeat the same tempo meta event once per track (one
   // per SATB part) rather than a real mid-piece tempo change — only reject
-  // when the values actually differ.
+  // when the values actually differ. A genuine mid-piece tempo change isn't
+  // supported by toSong() below (single bpm/tempoEvents entry), so those
+  // files are skipped by the caller instead of failing the whole batch.
   const distinctBpms = new Set(midi.header.tempos.map((t) => t.bpm))
   if (distinctBpms.size > 1) {
-    throw new Error(`${filePath}: has ${distinctBpms.size} distinct tempos (${[...distinctBpms].join(', ')}) — the generator assumes a single tempo, extend toSong() in the output before regenerating`)
+    throw new SkippedHymnError(filePath, `has ${distinctBpms.size} distinct tempos (${[...distinctBpms].join(', ')}) — mid-piece tempo changes aren't supported yet`)
   }
   const rawKey = midi.header.keySignatures[0]
   const keySignature = rawKey ? `${rawKey.key} ${rawKey.scale === 'minor' ? 'Minor' : 'Major'}` : 'C Major'
@@ -111,10 +126,21 @@ if (files.length === 0) {
   process.exit(1)
 }
 
-const rawSongs = files.map((f) => {
+const rawSongs = []
+const skipped = []
+for (const f of files) {
   const hymnNumber = /^HyC-(\d+)_mono-piano\.mid$/.exec(f)[1]
-  return buildRawSong(path.join(MIDI_DIR, f), hymnNumber)
-})
+  try {
+    rawSongs.push(buildRawSong(path.join(MIDI_DIR, f), hymnNumber))
+  } catch (err) {
+    if (err instanceof SkippedHymnError) {
+      skipped.push(hymnNumber)
+      console.warn(err.message)
+    } else {
+      throw err
+    }
+  }
+}
 
 function tupleLiteral(notes) {
   return notes.map((n) => `    [${n.join(', ')}],`).join('\n')
@@ -199,4 +225,7 @@ export const HIMNARIO_GRANDE_SONGS: Song[] = RAW_SONGS.map(toSong)
 `
 
 writeFileSync(OUT_FILE, output)
-console.log(`wrote ${OUT_FILE} (${rawSongs.length} hymns: ${rawSongs.map((s) => s.id).join(', ')})`)
+console.log(`wrote ${OUT_FILE} (${rawSongs.length} hymns)`)
+if (skipped.length > 0) {
+  console.log(`skipped ${skipped.length} unsupported hymns (see warnings above): ${skipped.join(', ')}`)
+}
