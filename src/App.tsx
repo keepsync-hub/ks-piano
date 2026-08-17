@@ -100,9 +100,10 @@ function App() {
 
   useEffect(() => {
     if (!activeProfile) return
-    // Prefer Twinkle Twinkle as a familiar default, but never load a song this
-    // profile hasn't unlocked yet — fall back to whatever tier 1 offers.
-    const preferred = unlockedSongs.find((s) => s.id === 'demo-twinkle')
+    // Prefer Merrily We Roll Along as a familiar first default, but never
+    // load a song this profile hasn't unlocked yet — fall back to whatever
+    // tier 1 offers.
+    const preferred = unlockedSongs.find((s) => s.id === 'apa-b1-u01-merrily')
     engine.loadSong(preferred ?? unlockedSongs[0] ?? DEMO_SONGS[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile])

@@ -54,23 +54,24 @@ de teoría ni escaneos. Para las **32 sesiones** hice esto:
 
 ## Cómo usar el repertorio generado
 
-Las 18 piezas/ejercicios ya están **integradas en la librería de canciones de la app**
+Las 22 piezas/ejercicios ya están **integradas en la librería de canciones de la app**
 (`src/midi/adultPianoAdventuresBook1.ts`, sumadas a `DEMO_SONGS` en `src/midi/demoSongs.ts`), así
 que aparecen directo en la lista de canciones agrupadas por Tier — no hace falta subir nada a
 mano. El mismo contenido también se exporta como `.mid` real en
 [`practice-plans/adult-piano-adventures-book1/midi/`](practice-plans/adult-piano-adventures-book1/midi/),
 regenerable con `node scripts/generate-adult-piano-adventures-midis.mjs`, por si se quiere abrir en
-otro programa o cargarlo con **"Upload your own .mid/.midi files"**. Cinco sesiones reutilizan
-canciones que ya estaban en la app antes de este plan: *Mary Had a Little Lamb*, *Twinkle Twinkle
-Little Star*, *Ode to Joy* y el *Two-Hand Arpeggio Étude*.
+otro programa o cargarlo con **"Upload your own .mid/.midi files"**. *Mary Had a Little Lamb*,
+*Twinkle Twinkle Little Star*, *Ode to Joy* y el *Two-Hand Arpeggio Étude* vivían antes como
+canciones de ejemplo genéricas en `demoSongs.ts`; al quitarse ese contenido de muestra se
+migraron aquí con su propio `.mid` generado, para no perder las 4 sesiones que dependían de ellas.
 
 Los Tiers de la librería (`src/piano/skillPath.ts`) se calculan automáticamente a partir de la
 densidad de notas, el rango, los acordes y el tempo de cada pieza (`src/piano/difficulty.ts`) — no
-son asignados a mano por unidad. Con las 18 piezas nuevas sumadas, la distribución quedó así:
+son asignados a mano por unidad. Con las 22 piezas, la distribución quedó así:
 
 | Tier | Piezas |
 |---|---|
-| 1 · Beginner | C Major Scale Warm-up, Mary Had a Little Lamb |
+| 1 · Beginner | Mary Had a Little Lamb |
 | 2 · Easy | Twinkle Twinkle, Ode to Joy, Merrily We Roll Along, Row Row Row Your Boat, Hot Cross Buns, Amazing Grace, Danny Boy, Greensleeves, The Entertainer (motivo), y los 6 calentamientos de pentacordio (Do/Sol/Fa/Re/La/La menor) |
 | 3 · Intermediate | Eine Kleine Nachtmusik (motivo), The Can-Can (motivo) |
 | 4 · Advanced | Two-Hand Arpeggio Étude, cadencia I–IV–V7–I en Do, cadencia I–IV–V7–I en Sol, escala de Do + cadencia final |
@@ -82,12 +83,12 @@ son asignados a mano por unidad. Con las 18 piezas nuevas sumadas, la distribuci
 |---|---|---|---|---|
 | 1 | 1 | Geografía del teclado, postura, valores rítmicos (redonda/blanca/negra), compás 4/4 | — (ritmo y tacto, sin pieza) | — |
 | 1 | 2 | Lectura direccional antes del pentagrama | Merrily We Roll Along | `unit01-merrily-we-roll-along.mid` (generado) |
-| 2 | 1 | Pentagrama, Do central, notas guía (Sol y Fa) | Mary Had a Little Lamb | Ya en la app (`demoSongs.ts`) |
+| 2 | 1 | Pentagrama, Do central, notas guía (Sol y Fa) | Mary Had a Little Lamb | `unit02-mary-had-a-little-lamb.mid` (generado) |
 | 2 | 2 | Primera pieza con manos independientes/juntas | Row, Row, Row Your Boat | `unit02-row-row-row-your-boat.mid` (generado) |
-| 3 | 1 | Técnica: pentacordio de Do | C Major Scale Warm-up | Ya en la app (`demoSongs.ts`) |
-| 3 | 2 | Lectura en posición de Do | Twinkle Twinkle Little Star | Ya en la app (`demoSongs.ts`) |
+| 3 | 1 | Técnica: pentacordio de Do | C Pentascale Warm-up | `unit03-c-pentascale.mid` (generado) |
+| 3 | 2 | Lectura en posición de Do | Twinkle Twinkle Little Star | `unit03-twinkle-twinkle-little-star.mid` (generado) |
 | 4 | 1 | Intervalos 2ª–5ª, silencio de negra | Hot Cross Buns | `unit04-hot-cross-buns.mid` (generado) |
-| 4 | 2 | Blanca con puntillo, repaso de intervalos | Ode to Joy | Ya en la app (`demoSongs.ts`) |
+| 4 | 2 | Blanca con puntillo, repaso de intervalos | Ode to Joy | `unit04-ode-to-joy.mid` (generado) |
 | 5 | 1 | Técnica: pentacordio de Sol, acorde I | G Pentascale Warm-up | `unit05-g-pentascale.mid` (generado) |
 | 5 | 2 | Compás de 3/4, acorde de Sol Mayor en bloque | Amazing Grace | `unit06-amazing-grace.mid` (generado) |
 | 6 | 1 | Corcheas y frases | Eine Kleine Nachtmusik (motivo) | `unit06-eine-kleine-nachtmusik-motif.mid` (generado, motivo simplificado) |
@@ -102,7 +103,7 @@ son asignados a mano por unidad. Con las 18 piezas nuevas sumadas, la distribuci
 | 10 | 2 | Pieza original del método con acordes | Clock Tower Bells | Buscar y cargar MIDI manualmente (pieza original de Faber, con copyright) |
 | 11 | 1 | Técnica: pentacordio de La, ritmo sincopado | A Pentascale Warm-up | `unit11-a-pentascale.mid` (generado) |
 | 11 | 2 | Pieza popular con síncopa | Lean on Me | Buscar y cargar MIDI manualmente (con copyright) |
-| 12 | 1 | Técnica: acordes sus4 y acompañamiento arpegiado | Two-Hand Arpeggio Étude | Ya en la app (`demoSongs.ts`) |
+| 12 | 1 | Técnica: acordes sus4 y acompañamiento arpegiado | Two-Hand Arpeggio Étude | `unit12-arpeggio-etude.mid` (generado) |
 | 12 | 2 | Lectura expresiva en tonalidad menor relativa | Greensleeves (frase) | `unit12-greensleeves-motif.mid` (generado, motivo simplificado) |
 | 13 | 1 | Técnica: pentacordio de La menor | A minor Pentascale Warm-up | `unit13-a-minor-pentascale.mid` (generado) |
 | 13 | 2 | Pieza popular en modo mayor con salto de octava | I'd Like to Teach the World to Sing | Buscar y cargar MIDI manualmente (con copyright) |

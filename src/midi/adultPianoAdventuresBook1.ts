@@ -130,6 +130,21 @@ const unit01MerrilyWeRollAlong = buildSong('apa-b1-u01-merrily', 'Merrily We Rol
   { note: 'C3', beat: 24, beats: 4, hand: 'left' }, { note: 'C3', beat: 28, beats: 4, hand: 'left' },
 ])
 
+const unit02Mary = buildSong('apa-b1-u02-mary', 'Mary Had a Little Lamb', 'Tradicional', 76, [
+  { note: 'E4', beat: 0, beats: 1, hand: 'right' }, { note: 'D4', beat: 1, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 2, beats: 1, hand: 'right' }, { note: 'D4', beat: 3, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 4, beats: 1, hand: 'right' }, { note: 'E4', beat: 5, beats: 1, hand: 'right' }, { note: 'E4', beat: 6, beats: 2, hand: 'right' },
+  { note: 'D4', beat: 8, beats: 1, hand: 'right' }, { note: 'D4', beat: 9, beats: 1, hand: 'right' }, { note: 'D4', beat: 10, beats: 2, hand: 'right' },
+  { note: 'E4', beat: 12, beats: 1, hand: 'right' }, { note: 'G4', beat: 13, beats: 1, hand: 'right' }, { note: 'G4', beat: 14, beats: 2, hand: 'right' },
+  { note: 'E4', beat: 16, beats: 1, hand: 'right' }, { note: 'D4', beat: 17, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 18, beats: 1, hand: 'right' }, { note: 'D4', beat: 19, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 20, beats: 1, hand: 'right' }, { note: 'E4', beat: 21, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 22, beats: 1, hand: 'right' }, { note: 'E4', beat: 23, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 24, beats: 1, hand: 'right' }, { note: 'D4', beat: 25, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 26, beats: 1, hand: 'right' }, { note: 'D4', beat: 27, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 28, beats: 4, hand: 'right' },
+])
+
 const unit02RowRowRowYourBoat = buildSong('apa-b1-u02-row-row-row', 'Row, Row, Row Your Boat', 'Tradicional', 92, [
   { note: 'C4', beat: 0, beats: 1, hand: 'right' }, { note: 'C4', beat: 1, beats: 1, hand: 'right' }, { note: 'C4', beat: 2, beats: 1, hand: 'right' },
   { note: 'D4', beat: 3, beats: 1, hand: 'right' }, { note: 'E4', beat: 4, beats: 2, hand: 'right' },
@@ -145,6 +160,33 @@ const unit02RowRowRowYourBoat = buildSong('apa-b1-u02-row-row-row', 'Row, Row, R
   { note: 'C3', beat: 12, beats: 12, hand: 'left' }, { note: 'G2', beat: 24, beats: 3, hand: 'left' }, { note: 'C3', beat: 27, beats: 3, hand: 'left' },
 ])
 
+const unit03Twinkle = buildSong('apa-b1-u03-twinkle', 'Twinkle Twinkle Little Star', 'Tradicional', 100, [
+  // melody - right hand
+  { note: 'C4', beat: 0, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 1, beats: 1, hand: 'right' },
+  { note: 'G4', beat: 2, beats: 1, hand: 'right' },
+  { note: 'G4', beat: 3, beats: 1, hand: 'right' },
+  { note: 'A4', beat: 4, beats: 1, hand: 'right' },
+  { note: 'A4', beat: 5, beats: 1, hand: 'right' },
+  { note: 'G4', beat: 6, beats: 2, hand: 'right' },
+  { note: 'F4', beat: 8, beats: 1, hand: 'right' },
+  { note: 'F4', beat: 9, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 10, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 11, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 12, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 13, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 14, beats: 2, hand: 'right' },
+  // left hand accompaniment (root notes)
+  { note: 'C3', beat: 0, beats: 2, hand: 'left' },
+  { note: 'G2', beat: 2, beats: 2, hand: 'left' },
+  { note: 'A2', beat: 4, beats: 2, hand: 'left' },
+  { note: 'F2', beat: 6, beats: 2, hand: 'left' },
+  { note: 'F2', beat: 8, beats: 2, hand: 'left' },
+  { note: 'C3', beat: 10, beats: 2, hand: 'left' },
+  { note: 'G2', beat: 12, beats: 2, hand: 'left' },
+  { note: 'C3', beat: 14, beats: 2, hand: 'left' },
+])
+
 const unit04HotCrossBuns = buildSong('apa-b1-u04-hot-cross-buns', 'Hot Cross Buns', 'Tradicional', 100, [
   { note: 'E4', beat: 0, beats: 1, hand: 'right' }, { note: 'D4', beat: 1, beats: 1, hand: 'right' }, { note: 'C4', beat: 2, beats: 2, hand: 'right' },
   { note: 'E4', beat: 4, beats: 1, hand: 'right' }, { note: 'D4', beat: 5, beats: 1, hand: 'right' }, { note: 'C4', beat: 6, beats: 2, hand: 'right' },
@@ -154,6 +196,28 @@ const unit04HotCrossBuns = buildSong('apa-b1-u04-hot-cross-buns', 'Hot Cross Bun
   { note: 'D4', beat: 11, beats: 0.5, hand: 'right' }, { note: 'D4', beat: 11.5, beats: 0.5, hand: 'right' },
   { note: 'E4', beat: 12, beats: 1, hand: 'right' }, { note: 'D4', beat: 13, beats: 1, hand: 'right' }, { note: 'C4', beat: 14, beats: 2, hand: 'right' },
   { note: 'C3', beat: 0, beats: 8, hand: 'left' }, { note: 'G2', beat: 8, beats: 4, hand: 'left' }, { note: 'C3', beat: 12, beats: 4, hand: 'left' },
+])
+
+const unit04OdeToJoy = buildSong('apa-b1-u04-ode-to-joy', 'Ode to Joy (theme)', 'Beethoven', 112, [
+  { note: 'E4', beat: 0, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 1, beats: 1, hand: 'right' },
+  { note: 'F4', beat: 2, beats: 1, hand: 'right' },
+  { note: 'G4', beat: 3, beats: 1, hand: 'right' },
+  { note: 'G4', beat: 4, beats: 1, hand: 'right' },
+  { note: 'F4', beat: 5, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 6, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 7, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 8, beats: 1, hand: 'right' },
+  { note: 'C4', beat: 9, beats: 1, hand: 'right' },
+  { note: 'D4', beat: 10, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 11, beats: 1, hand: 'right' },
+  { note: 'E4', beat: 12, beats: 1.5, hand: 'right' },
+  { note: 'D4', beat: 13.5, beats: 0.5, hand: 'right' },
+  { note: 'D4', beat: 14, beats: 2, hand: 'right' },
+  { note: 'C3', beat: 0, beats: 4, hand: 'left' },
+  { note: 'G2', beat: 4, beats: 4, hand: 'left' },
+  { note: 'C3', beat: 8, beats: 4, hand: 'left' },
+  { note: 'G2', beat: 12, beats: 4, hand: 'left' },
 ])
 
 const unit06AmazingGrace = buildSong(
@@ -225,6 +289,27 @@ const unit08DannyBoyMotif = buildSong(
   { keySignature: 'D Major' },
 )
 
+// Original technical exercise: fast two-hand broken chords across a wide
+// range, with real left-hand chords — practice for the unit's sus4 chords
+// and arpeggiated accompaniment, not a real piece.
+const arpeggioNotes: BeatNote[] = []
+const arpeggioPattern = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'E5', 'C5']
+const arpeggioBassChords: [string, string][] = [
+  ['C3', 'G3'],
+  ['A2', 'E3'],
+  ['F2', 'C3'],
+  ['G2', 'D3'],
+]
+for (let bar = 0; bar < 4; bar++) {
+  arpeggioPattern.forEach((note, i) => {
+    arpeggioNotes.push({ note, beat: bar * 4 + i * 0.5, beats: 0.5, hand: 'right' })
+  })
+  const [low, high] = arpeggioBassChords[bar % arpeggioBassChords.length]
+  arpeggioNotes.push({ note: low, beat: bar * 4, beats: 4, hand: 'left' })
+  arpeggioNotes.push({ note: high, beat: bar * 4, beats: 4, hand: 'left' })
+}
+const unit12ArpeggioEtude = buildSong('apa-b1-u12-arpeggio-etude', 'Two-Hand Arpeggio Étude', 'Ejercicio original', 132, arpeggioNotes)
+
 const unit12GreensleevesMotif = buildSong(
   'apa-b1-u12-greensleeves',
   'Greensleeves — frase simplificada',
@@ -258,9 +343,12 @@ const unit14TheEntertainerMotif = buildSong(
 
 export const ADULT_PIANO_ADVENTURES_BOOK1_SONGS: Song[] = [
   unit01MerrilyWeRollAlong,
+  unit02Mary,
   unit02RowRowRowYourBoat,
   unit03CPentascale,
+  unit03Twinkle,
   unit04HotCrossBuns,
+  unit04OdeToJoy,
   unit05GPentascale,
   unit06AmazingGrace,
   unit06EineKleineNachtmusikMotif,
@@ -271,6 +359,7 @@ export const ADULT_PIANO_ADVENTURES_BOOK1_SONGS: Song[] = [
   unit09DPentascale,
   unit10CadenceG,
   unit11APentascale,
+  unit12ArpeggioEtude,
   unit12GreensleevesMotif,
   unit13AMinorPentascale,
   unit14TheEntertainerMotif,
