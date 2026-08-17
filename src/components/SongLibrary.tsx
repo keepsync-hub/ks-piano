@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ProfileType, Song } from '../types'
-import { DEMO_SONGS } from '../midi/demoSongs'
 import { parseMidiFile } from '../midi/parser'
 import { buildSkillPath } from '../piano/skillPath'
 import './SongLibrary.css'
 
 interface SongLibraryProps {
+  songs: Song[]
   currentSongId: string | undefined
   onSelect: (song: Song) => void
   profileType: ProfileType
@@ -13,14 +13,14 @@ interface SongLibraryProps {
   isDueForReview: (songId: string) => boolean
 }
 
-export function SongLibrary({ currentSongId, onSelect, profileType, bestStarsFor, isDueForReview }: SongLibraryProps) {
+export function SongLibrary({ songs, currentSongId, onSelect, profileType, bestStarsFor, isDueForReview }: SongLibraryProps) {
   const [uploaded, setUploaded] = useState<Song[]>([])
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const tiers = useMemo(
-    () => buildSkillPath(DEMO_SONGS, bestStarsFor, profileType),
-    [bestStarsFor, profileType],
+    () => buildSkillPath(songs, bestStarsFor, profileType),
+    [songs, bestStarsFor, profileType],
   )
 
   async function handleFiles(files: FileList | null) {

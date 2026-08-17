@@ -6,7 +6,7 @@ import { useProgress } from './hooks/useProgress'
 import { useProfiles } from './hooks/useProfiles'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useWorkout } from './hooks/useWorkout'
-import { DEMO_SONGS } from './midi/demoSongs'
+import { useDemoSongs } from './hooks/useDemoSongs'
 import { buildSkillPath } from './piano/skillPath'
 import { SongLibrary } from './components/SongLibrary'
 import { PianoKeyboard } from './components/PianoKeyboard'
@@ -50,14 +50,15 @@ function App() {
   })
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
 
+  const demoSongs = useDemoSongs()
   const bestStarsFor = useCallback((songId: string) => getSongProgress(songId)?.bestStars ?? 0, [getSongProgress])
   const unlockedSongs = useMemo(() => {
-    const tiers = buildSkillPath(DEMO_SONGS, bestStarsFor, profileType)
+    const tiers = buildSkillPath(demoSongs, bestStarsFor, profileType)
     return tiers.filter((t) => t.unlocked).flatMap((t) => t.songs)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileType, stats.totalStars])
+  }, [demoSongs, profileType, stats.totalStars])
 
-  const workout = useWorkout(unlockedSongs.length > 0 ? unlockedSongs : DEMO_SONGS, engine.loadSong, engine.setMode)
+  const workout = useWorkout(unlockedSongs.length > 0 ? unlockedSongs : demoSongs, engine.loadSong, engine.setMode)
   workoutCompleteRef.current = workout.recordSongComplete
   workoutNoteRef.current = workout.recordNote
 
@@ -104,7 +105,7 @@ function App() {
     // load a song this profile hasn't unlocked yet — fall back to whatever
     // tier 1 offers.
     const preferred = unlockedSongs.find((s) => s.id === 'apa-b1-u01-merrily')
-    engine.loadSong(preferred ?? unlockedSongs[0] ?? DEMO_SONGS[0])
+    engine.loadSong(preferred ?? unlockedSongs[0] ?? demoSongs[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile])
 
@@ -173,6 +174,7 @@ function App() {
         {sidebarOpen && (
           <aside className="sidebar">
             <SongLibrary
+              songs={demoSongs}
               currentSongId={engine.song?.id}
               onSelect={engine.loadSong}
               profileType={activeProfile.type}
