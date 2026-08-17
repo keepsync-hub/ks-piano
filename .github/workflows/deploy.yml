@@ -25,6 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Enables the repo's Pages site for GitHub Actions deployments (source
+      # otherwise defaults to "Deploy from a branch"), which is what the
+      # deploy job's actions/deploy-pages step below requires to succeed.
+      - uses: actions/configure-pages@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 20
