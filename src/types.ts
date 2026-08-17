@@ -9,6 +9,13 @@ export interface NoteEvent {
   duration: number
   velocity: number
   hand: Hand
+  /**
+   * Which notation voice this note belongs to when its stave carries two
+   * independent voices sharing one clef (e.g. SATB hymn parts) — 0 is the
+   * upper voice (stems up), 1 is the lower voice (stems down). Undefined
+   * means "the only voice on this stave", the common single-voice case.
+   */
+  voice?: 0 | 1
   /** Suggested or user-set fingering, 1 (thumb) to 5 (little finger). */
   finger?: number
   /** Musical position in MIDI ticks; tempo-independent, so notation uses it. */
