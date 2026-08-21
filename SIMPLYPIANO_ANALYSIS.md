@@ -51,7 +51,7 @@
 | **Aprendizaje** | **Cursos estructurados** | ❌ **Falta** |
 | **Aprendizaje** | **Secciones de canciones** | ❌ **Falta** |
 | **Aprendizaje** | **5-minute workouts** | ❌ **Falta** |
-| **Entrada** | **Detección por micrófono** | ❌ **Falta** |
+| **Entrada** | **Detección por micrófono** | ✅ **Implementado** |
 | **Contenido** | **Biblioteca grande** | ❌ **Falta** |
 | **Contenido** | **Partituras imprimibles** | ❌ **Falta** |
 
@@ -89,9 +89,10 @@
    - Selección aleatoria de ejercicios cortos
    - Enfoque en conceptos recientes
 
-7. **Detección por micrófono**
-   - Usar Web Audio API + pitch detection
-   - Permitir usar piano acústico sin MIDI
+7. **Detección por micrófono** — *implementado*
+   - Web Audio `AnalyserNode` + suma armónica con resta iterativa de parciales
+   - Permite usar un piano acústico sin MIDI; monofónico sólido, acordes aproximados
+   - Ver la sección «Playing through the microphone» del `README.md` para los límites
 
 ### Prioridad Baja
 

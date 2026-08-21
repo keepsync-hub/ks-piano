@@ -39,5 +39,5 @@ La segunda mitad del objetivo — "un perfil para niño y un perfil para adulto 
 
 - **Corazones/vidas**: penalizar intentos va contra cómo se aprende un instrumento (repetición deliberada de un pasaje difícil).
 - **Ligas/leaderboard social**: requiere backend y cuentas; no encaja en una app 100% local basada en `localStorage`.
-- **Detección por micrófono** (ya señalado en `SIMPLYPIANO_ANALYSIS.md`): sigue pendiente, es ortogonal a la gamificación.
+- **Detección por micrófono** (señalada en `SIMPLYPIANO_ANALYSIS.md`): ya implementada, y ortogonal a la gamificación — el modo práctica no distingue de dónde viene una nota.
 - **Migración del progreso previo a `ks-piano-progress`** (clave global, sin perfil): se dejó fuera a propósito — es una app de demostración sin usuarios reales dependiendo de datos guardados, así que no se justificaba el código de migración. Cada perfil nuevo arranca en cero.

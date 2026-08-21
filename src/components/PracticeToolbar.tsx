@@ -1,4 +1,7 @@
 import type { HandFilter, LoopRegion, MixerState } from '../hooks/usePlaybackEngine'
+import type { MicSettings } from '../hooks/useMicrophoneInput'
+import type { MicStatus } from '../audio/micInput'
+import { midiToLabel, midiToOctave } from '../piano/noteNames'
 import type { Hand } from '../types'
 import './PracticeToolbar.css'
 
@@ -32,6 +35,22 @@ interface PracticeToolbarProps {
   inputOctaveShift: number
   onInputOctaveShiftChange: (shift: number) => void
   hasMidiDevice: boolean
+  micEnabled: boolean
+  onMicEnabledChange: (enabled: boolean) => void
+  micStatus: MicStatus
+  micLevel: number
+  micDetectedMidi: number | null
+  micSettings: MicSettings
+  onMicSettingsChange: (settings: MicSettings) => void
+  onMicCalibrate: () => void
+}
+
+const MIC_STATUS_TEXT: Record<MicStatus, string> = {
+  off: 'Off',
+  requesting: 'Asking permission…',
+  listening: 'Listening',
+  denied: 'Permission denied',
+  unsupported: 'Not supported here',
 }
 
 function formatTime(s: number): string {
@@ -70,6 +89,14 @@ export function PracticeToolbar({
   inputOctaveShift,
   onInputOctaveShiftChange,
   hasMidiDevice,
+  micEnabled,
+  onMicEnabledChange,
+  micStatus,
+  micLevel,
+  micDetectedMidi,
+  micSettings,
+  onMicSettingsChange,
+  onMicCalibrate,
 }: PracticeToolbarProps) {
   return (
     <>
@@ -220,6 +247,62 @@ export function PracticeToolbar({
             {showFingering ? 'On' : 'Off'}
           </button>
           {showFingering && <span className="tool-hint">Press 1–5 while practising to correct</span>}
+        </div>
+
+        <div className="tool-group tool-group-mic" role="group" aria-label="Microphone input">
+          <span className="tool-label">Microphone</span>
+          <button
+            type="button"
+            className={micEnabled ? 'tool-btn tool-btn-active' : 'tool-btn'}
+            onClick={() => onMicEnabledChange(!micEnabled)}
+            title="Hear the notes you play on a real piano, instead of using a MIDI cable"
+            aria-pressed={micEnabled}
+          >
+            {micEnabled ? 'On' : 'Off'}
+          </button>
+          <span className="tool-readout tool-readout-wide">{MIC_STATUS_TEXT[micStatus]}</span>
+          {micEnabled && micStatus === 'listening' && (
+            <>
+              <div className="mic-meter" role="presentation">
+                <div className="mic-meter-fill" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+              </div>
+              <span className="mic-note" aria-live="off">
+                {micDetectedMidi === null ? '—' : `${midiToLabel(micDetectedMidi)}${midiToOctave(micDetectedMidi)}`}
+              </span>
+              <button type="button" className="tool-btn" onClick={onMicCalibrate} title="Measure the room noise — stay quiet for a moment">
+                Calibrate
+              </button>
+              <label className="tool-slider">
+                Sensitivity
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Math.round(micSettings.sensitivity * 100)}
+                  onChange={(e) => onMicSettingsChange({ ...micSettings, sensitivity: Number(e.target.value) / 100 })}
+                  aria-label="Microphone sensitivity"
+                />
+              </label>
+              <label className="tool-check">
+                <input
+                  type="checkbox"
+                  checked={micSettings.chordDetection}
+                  onChange={(e) => onMicSettingsChange({ ...micSettings, chordDetection: e.target.checked })}
+                />
+                Chords (experimental)
+              </label>
+              <label className="tool-check">
+                <input
+                  type="checkbox"
+                  checked={micSettings.octaveTolerance}
+                  onChange={(e) => onMicSettingsChange({ ...micSettings, octaveTolerance: e.target.checked })}
+                />
+                Allow octave slips
+              </label>
+              <span className="tool-hint">Use headphones — the app's own sound confuses the detector.</span>
+            </>
+          )}
         </div>
 
         {hasMidiDevice && (

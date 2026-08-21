@@ -169,3 +169,42 @@
   font-weight: 700;
   font-size: 11px;
 }
+
+.tool-group-mic .tool-readout-wide {
+  min-width: 96px;
+  text-align: left;
+}
+
+.mic-meter {
+  flex: 1 1 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-sunken, rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.mic-meter-fill {
+  height: 100%;
+  background: var(--brand);
+  transition: width 0.1s linear;
+}
+
+.mic-note {
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 32px;
+}
+
+.tool-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9aa0b0;
+  flex: 1 1 100%;
+}
+
+.tool-slider input {
+  flex: 1;
+}

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaybackEngine } from './hooks/usePlaybackEngine'
 import { useComputerKeyboard } from './hooks/useComputerKeyboard'
+import { DEFAULT_MIC_SETTINGS, useMicrophoneInput, type MicSettings } from './hooks/useMicrophoneInput'
 import { useShortcuts } from './hooks/useShortcuts'
 import { useProgress } from './hooks/useProgress'
 import { useProfiles } from './hooks/useProfiles'
@@ -54,6 +55,53 @@ function App() {
     },
   })
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
+
+  // Microphone input: notes heard on a real piano, treated like MIDI notes.
+  const [micEnabled, setMicEnabled] = useState(false)
+  const [micPreferred, setMicPreferred] = useLocalStorage('ks-piano-mic-on', false)
+  const [micSettings, setMicSettings] = useLocalStorage<MicSettings>('ks-piano-mic', DEFAULT_MIC_SETTINGS)
+
+  const { noteOn: engineNoteOn, noteOff: engineNoteOff } = engine
+  const handleMicNoteOn = useCallback(
+    (midi: number, velocity: number) => engineNoteOn(midi, velocity, 'mic'),
+    [engineNoteOn],
+  )
+  const handleMicUnavailable = useCallback(() => {
+    setMicEnabled(false)
+    setMicPreferred(false)
+  }, [setMicPreferred])
+
+  const mic = useMicrophoneInput({
+    enabled: micEnabled,
+    settings: micSettings,
+    onNoteOn: handleMicNoteOn,
+    onNoteOff: engineNoteOff,
+    soundingNotes: engine.soundingNotes,
+    requiredNotes: engine.nextRequiredNotes,
+    advanceKey: engine.nextRequiredTime,
+    onUnavailable: handleMicUnavailable,
+  })
+
+  const handleMicEnabledChange = useCallback(
+    (enabled: boolean) => {
+      setMicEnabled(enabled)
+      setMicPreferred(enabled)
+    },
+    [setMicPreferred],
+  )
+
+  // Re-opening the microphone without a click is only allowed once permission
+  // has already been granted; otherwise it waits for the toggle.
+  useEffect(() => {
+    if (!micPreferred) return
+    navigator.permissions
+      ?.query({ name: 'microphone' as PermissionName })
+      .then((result) => {
+        if (result.state === 'granted') setMicEnabled(true)
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const demoSongs = useDemoSongs()
   const bestStarsFor = useCallback((songId: string) => getSongProgress(songId)?.bestStars ?? 0, [getSongProgress])
@@ -183,7 +231,8 @@ function App() {
         </div>
         <p className="tagline">
           Piano trainer — falling notes, sheet music, or both at once, with a metronome, section looping and
-          one-hand practice. Play along on a MIDI keyboard, your computer keys, or the on-screen keys.
+          one-hand practice. Play along on a MIDI keyboard, your computer keys, the on-screen keys, or an
+          acoustic piano through your microphone.
         </p>
         <Legend />
       </header>
@@ -269,6 +318,8 @@ function App() {
             speed={engine.speed}
             mode={engine.mode}
             midiDevices={engine.midiDevices}
+            micStatus={mic.status}
+            micDetectedMidi={mic.detectedMidi}
             isWaitingForInput={engine.isWaitingForInput}
             loop={engine.loop}
             loopEnabled={engine.loopEnabled}
@@ -317,6 +368,14 @@ function App() {
             inputOctaveShift={engine.inputOctaveShift}
             onInputOctaveShiftChange={engine.setInputOctaveShift}
             hasMidiDevice={engine.midiDevices.length > 0}
+            micEnabled={micEnabled}
+            onMicEnabledChange={handleMicEnabledChange}
+            micStatus={mic.status}
+            micLevel={mic.level}
+            micDetectedMidi={mic.detectedMidi}
+            micSettings={micSettings}
+            onMicSettingsChange={setMicSettings}
+            onMicCalibrate={mic.calibrate}
           />
         </main>
       </div>
