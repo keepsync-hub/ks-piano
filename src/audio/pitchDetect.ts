@@ -26,6 +26,11 @@ export interface DetectOptions {
   relativeThreshold?: number
   /** How far a note's partials must stand above the average bin to count as a note at all. */
   noiseFactor?: number
+  /**
+   * Notes practice mode is waiting for. They are checked *after* the blind
+   * search, against what it could not explain — see detectNotes.
+   */
+  expected?: readonly number[]
 }
 
 const DEFAULTS = {
@@ -35,6 +40,7 @@ const DEFAULTS = {
   harmonics: 8,
   relativeThreshold: 0.35,
   noiseFactor: 3,
+  expected: [] as readonly number[],
 }
 
 /**
@@ -79,11 +85,40 @@ function peakNear(spectrum: Float32Array, freq: number, binHz: number): number {
   return peak
 }
 
-function clearNear(spectrum: Float32Array, freq: number, binHz: number): void {
+function subtractNear(spectrum: Float32Array, freq: number, binHz: number, amount: number): void {
   const half = Math.max(binHz, freq * BAND)
   const from = Math.max(0, Math.round((freq - half) / binHz))
   const to = Math.min(spectrum.length - 1, Math.round((freq + half) / binHz))
-  for (let i = from; i <= to; i++) spectrum[i] = 0
+  for (let i = from; i <= to; i++) spectrum[i] = Math.max(0, spectrum[i] - amount)
+}
+
+/**
+ * Removes a note from the spectrum by subtracting the *smoothed* envelope of
+ * its partials rather than everything found at them.
+ *
+ * A lone note's partials decay smoothly, so the envelope takes them out almost
+ * whole. A partial shared with another note stands out against its neighbours,
+ * the moving average falls short of it, and the excess — which is the other
+ * note — survives. Erasing the bands instead makes chords undetectable: in an
+ * octave the upper note's fundamental *is* the lower note's second partial,
+ * so erasing takes the second note with it.
+ */
+function subtractNote(spectrum: Float32Array, midi: number, binHz: number, harmonics: number): void {
+  const f0 = midiToFrequency(midi)
+  const nyquist = spectrum.length * binHz
+  const peaks: number[] = []
+  for (let h = 1; h <= harmonics; h++) {
+    const freq = f0 * h
+    if (freq >= nyquist) break
+    peaks.push(peakNear(spectrum, freq, binHz))
+  }
+
+  for (let i = 0; i < peaks.length; i++) {
+    const before = peaks[i - 1] ?? peaks[i]
+    const after = peaks[i + 1] ?? peaks[i]
+    const smoothed = Math.min(peaks[i], (before + peaks[i] + after) / 3)
+    subtractNear(spectrum, f0 * (i + 1), binHz, smoothed)
+  }
 }
 
 /**
@@ -140,7 +175,10 @@ function refineOctave(spectrum: Float32Array, midi: number, binHz: number, harmo
  * `binHz` is the width of one spectrum bin, i.e. sampleRate / fftSize.
  */
 export function detectNotes(magnitudes: Float32Array, binHz: number, options: DetectOptions = {}): DetectedNote[] {
-  const { maxNotes, minMidi, maxMidi, harmonics, relativeThreshold, noiseFactor } = { ...DEFAULTS, ...options }
+  const { maxNotes, minMidi, maxMidi, harmonics, relativeThreshold, noiseFactor, expected } = {
+    ...DEFAULTS,
+    ...options,
+  }
   if (magnitudes.length === 0 || binHz <= 0) return []
 
   // Any spectrum with energy in it has a best candidate, so without this floor
@@ -178,8 +216,38 @@ export function detectNotes(magnitudes: Float32Array, binHz: number, options: De
       found.push({ midi, salience: bestScore })
     }
 
-    const f0 = midiToFrequency(bestMidi)
-    for (let h = 1; h <= harmonics; h++) clearNear(spectrum, f0 * h, binHz)
+    subtractNote(spectrum, bestMidi, binHz, harmonics)
+  }
+
+  // Second pass, guided by the notes practice mode is waiting for. Resolving
+  // "which notes are sounding?" blind is the hard problem; asking "is this
+  // particular note sounding?" of the leftovers is a far easier one, and it is
+  // what recovers the quiet inner voices of a dense chord.
+  //
+  // The order matters and is the opposite of the intuitive one. Guiding first
+  // would accept notes nobody played: if C4 is sounding and C5 is expected,
+  // C4's partials ARE C5's harmonic series, so C5 would pass on borrowed
+  // evidence. Searching blind first finds C4 on its own complete series and
+  // subtracts it, leaving nothing to sustain C5.
+  for (let pass = 0; pass < expected.length; pass++) {
+    let bestMidi = -1
+    let bestScore = 0
+    for (const midi of expected) {
+      if (found.some((n) => n.midi === midi)) continue
+      const score = scoreMidi(spectrum, midi, binHz, harmonics)
+      if (score > bestScore) {
+        bestScore = score
+        bestMidi = midi
+      }
+    }
+    // Each expected note answers for its own evidence — the fundamental floor
+    // inside scoreMidi and the noise floor here — with no relative threshold
+    // between them, so a soft voice is not dropped for being softer than the
+    // loudest one.
+    if (bestMidi < 0 || bestScore <= noiseLevel) break
+
+    found.push({ midi: bestMidi, salience: bestScore })
+    subtractNote(spectrum, bestMidi, binHz, harmonics)
   }
 
   return found

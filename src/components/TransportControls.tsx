@@ -39,6 +39,7 @@ function inputStatusText(midiDevices: string[], micStatus: MicStatus, micDetecte
     const heard = micDetectedMidi === null ? '—' : `${midiToLabel(micDetectedMidi)}${midiToOctave(micDetectedMidi)}`
     return `Mic: listening — ${heard}`
   }
+  // 'idle' and 'off' fall through: what matters then is the other input sources.
   if (micStatus === 'requesting') return 'Mic: asking for permission…'
   if (micStatus === 'waiting') return 'Mic: click anywhere to start listening'
   if (micStatus === 'denied') return 'Mic: permission denied — use the on-screen keys or A–; keys'

@@ -61,11 +61,12 @@ Practice mode can listen to the microphone and treat what it hears as note on/of
 events, so an acoustic piano — or a digital one with no USB cable — drives the
 same practice gate a MIDI keyboard would.
 
-It is **on by default**, so the browser asks for microphone access as soon as the
-page loads. Turn it off — or back on — under **Options → Microphone**; that choice
-is remembered, and so is a denied permission, so you are never asked twice. The
-level meter and the note readout are there to check that it is hearing you before
-you start.
+It is **on by default**, but only ever opens in practice mode, so the browser
+asks for access the first time you press **Practice** rather than on load — and
+the recording indicator goes out again when you switch back to Listen. Turn it
+off, or back on, under **Options → Microphone**; that choice is remembered, and
+so is a denied permission, so you are never asked twice. The level meter and the
+note readout are there to check that it is hearing you before you start.
 
 Browsers refuse to process audio until the page itself has been clicked, and
 granting the permission does not count, so the status may read *click the page to
@@ -73,15 +74,27 @@ start* for a moment after loading. Any click or keypress clears it.
 
 The browser's `AnalyserNode` does the FFT, and each candidate note is scored by
 the energy at its harmonics; taking the best candidate, subtracting its partials
-and repeating turns the same loop into an approximate chord detector.
+and repeating turns the same loop into an approximate chord detector. What gets
+subtracted is the *smoothed* envelope of that note's partials, not everything
+found at them — a partial shared with another note stands out against its
+neighbours, so the excess survives for that other note to be found by.
+
+In practice mode a second pass then looks specifically for the notes you are
+being asked to play, which is what makes chords work: deciding "which notes are
+sounding?" blind is a hard problem, while checking "is this particular note
+sounding?" is an easy one. It runs *after* the blind search and only against what
+that could not explain, so an expected note cannot ride on another note's
+harmonics — and it still has to show energy at its own fundamental, so a chord
+you did not play is not accepted for you.
 
 What it does and does not do well:
 
 - **Melody and one-hand practice**: reliable, and the main reason to use it.
-- **Two-note intervals**: usually found. **Three-note chords**: hit and miss.
-  **Four dense voices** (an SATB hymn struck at once): not resolvable — roll the
-  chord instead, since a note stays held for 700 ms after it stops being heard,
-  which is long enough for an arpeggiated chord to count as one grip.
+- **Chords in practice mode**: the guided pass finds all four voices of an SATB
+  hymn chord in testing. Away from practice mode — in Listen, or on notes you are
+  not being asked for — the blind detector still tops out at about three.
+- A note stays held for 700 ms after it stops being heard, so rolling a chord
+  still counts as one grip if a voice is missed.
 - **Use headphones.** The app's own accompaniment leaks into the microphone; the
   notes it is playing itself are ignored, but a loud room still costs accuracy.
 - A note whose fundamental the microphone rolls off entirely reads as the octave

@@ -55,6 +55,17 @@ describe('useMicrophoneInput', () => {
     expect(captured.handlers?.correct?.(48)).toBe(48)
   })
 
+  it('hands the detector the notes practice mode is waiting for', async () => {
+    const { rerender, props } = setup({ requiredNotes: new Set([60, 64, 67]) })
+    await waitFor(() => expect(captured.handlers).toBeDefined())
+
+    expect([...(captured.handlers?.expectedNotes?.() ?? [])].sort((a, b) => a - b)).toEqual([60, 64, 67])
+
+    // They follow the gate, without reconnecting the microphone.
+    rerender({ ...props, requiredNotes: new Set([72]) })
+    expect([...(captured.handlers?.expectedNotes?.() ?? [])]).toEqual([72])
+  })
+
   it('ignores a note the app is sounding itself', async () => {
     const { rerender, props } = setup()
     await waitFor(() => expect(captured.handlers).toBeDefined())

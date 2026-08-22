@@ -9,6 +9,8 @@ import { createNoteTracker, detectNotes } from './pitchDetect'
 
 export type MicStatus =
   | 'off'
+  /** Switched on, but only listening once practice mode starts. */
+  | 'idle'
   | 'requesting'
   /** Permission granted, but the browser will not process audio until the page is clicked. */
   | 'waiting'
@@ -30,6 +32,11 @@ export interface MicInputHandlers {
   shouldIgnore?: (midi: number) => boolean
   /** Last chance to correct a detected pitch, e.g. an octave slip. */
   correct?: (midi: number) => number
+  /**
+   * Notes practice mode is currently waiting for, read fresh on every frame —
+   * a getter rather than a setting, since they change with every chord.
+   */
+  expectedNotes?: () => readonly number[]
 }
 
 export interface MicOptions {
@@ -201,7 +208,11 @@ export async function connectMicInput(
       analyser.getFloatFrequencyData(decibels)
       for (let i = 0; i < decibels.length; i++) magnitudes[i] = Math.pow(10, decibels[i] / 20)
 
-      for (const note of detectNotes(magnitudes, binHz, { maxNotes: settings.chordDetection ? 3 : 1 })) {
+      const detected = detectNotes(magnitudes, binHz, {
+        maxNotes: settings.chordDetection ? 3 : 1,
+        expected: settings.chordDetection ? (handlers.expectedNotes?.() ?? []) : [],
+      })
+      for (const note of detected) {
         if (handlers.shouldIgnore?.(note.midi)) continue
         const midi = handlers.correct?.(note.midi) ?? note.midi
         if (!heard.includes(midi)) heard.push(midi)
