@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { LoopRegion } from '../hooks/usePlaybackEngine'
 import type { SongProgress } from '../hooks/useProgress'
 import type { PlaybackMode, Song } from '../types'
+import type { MicStatus } from '../audio/micInput'
+import { midiToLabel, midiToOctave } from '../piano/noteNames'
 import './TransportControls.css'
 
 interface TransportControlsProps {
@@ -12,6 +14,8 @@ interface TransportControlsProps {
   speed: number
   mode: PlaybackMode
   midiDevices: string[]
+  micStatus: MicStatus
+  micDetectedMidi: number | null
   isWaitingForInput: boolean
   loop?: LoopRegion | null
   loopEnabled?: boolean
@@ -29,6 +33,18 @@ function formatTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+/** One line describing where live notes can come from right now. */
+function inputStatusText(midiDevices: string[], micStatus: MicStatus, micDetectedMidi: number | null): string {
+  if (micStatus === 'listening') {
+    const heard = micDetectedMidi === null ? '—' : `${midiToLabel(micDetectedMidi)}${midiToOctave(micDetectedMidi)}`
+    return `Mic: listening — ${heard}`
+  }
+  if (micStatus === 'requesting') return 'Mic: asking for permission…'
+  if (micStatus === 'denied') return 'Mic: permission denied — use the on-screen keys or A–; keys'
+  if (midiDevices.length > 0) return `MIDI: ${midiDevices.join(', ')}`
+  return 'No MIDI device — use the on-screen keys, A–; keys, or the microphone'
+}
+
 export function TransportControls({
   song,
   playing,
@@ -37,6 +53,8 @@ export function TransportControls({
   speed,
   mode,
   midiDevices,
+  micStatus,
+  micDetectedMidi,
   isWaitingForInput,
   loop,
   loopEnabled,
@@ -158,9 +176,7 @@ export function TransportControls({
             ))}
           </span>
         )}
-        <span className="status-pill status-pill-muted">
-          {midiDevices.length > 0 ? `MIDI: ${midiDevices.join(', ')}` : 'No MIDI device — use the on-screen keys or A–; keys'}
-        </span>
+        <span className="status-pill status-pill-muted">{inputStatusText(midiDevices, micStatus, micDetectedMidi)}</span>
       </div>
     </div>
   )

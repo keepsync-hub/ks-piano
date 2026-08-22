@@ -11,6 +11,11 @@ interface NoteGroup {
 }
 
 export type HandFilter = 'both' | Hand
+/**
+ * Where a live note came from. Microphone notes are already audible in the
+ * room, so the app must not sound them a second time.
+ */
+export type NoteSource = 'device' | 'mic'
 export interface LoopRegion {
   start: number
   end: number
@@ -400,7 +405,7 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
   )
 
   const noteOn = useCallback(
-    (midi: number, velocity = 0.9) => {
+    (midi: number, velocity = 0.9, source: NoteSource = 'device') => {
       void ensureAudioStarted()
       if (!heldNotesRef.current.has(midi)) {
         heldNotesRef.current.add(midi)
@@ -416,7 +421,9 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
         }
         callbacksRef.current?.onNotePlayed?.(midi, isCorrect)
       }
-      playNote(midi, velocity)
+      // A note heard through the microphone is being played on a real
+      // instrument already — doubling it would also feed the detector back.
+      if (source !== 'mic') playNote(midi, velocity)
     },
     [],
   )
