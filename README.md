@@ -59,9 +59,17 @@ React + TypeScript + Vite, [Tone.js](https://tonejs.github.io/) for synthesis, t
 
 Practice mode can listen to the microphone and treat what it hears as note on/off
 events, so an acoustic piano — or a digital one with no USB cable — drives the
-same practice gate a MIDI keyboard would. Turn it on under **Options →
-Microphone**; the level meter and the note readout are there to check that it is
-hearing you before you start.
+same practice gate a MIDI keyboard would.
+
+It is **on by default**, so the browser asks for microphone access as soon as the
+page loads. Turn it off — or back on — under **Options → Microphone**; that choice
+is remembered, and so is a denied permission, so you are never asked twice. The
+level meter and the note readout are there to check that it is hearing you before
+you start.
+
+Browsers refuse to process audio until the page itself has been clicked, and
+granting the permission does not count, so the status may read *click the page to
+start* for a moment after loading. Any click or keypress clears it.
 
 The browser's `AnalyserNode` does the FFT, and each candidate note is scored by
 the energy at its harmonics; taking the best candidate, subtracting its partials

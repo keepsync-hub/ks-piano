@@ -108,7 +108,9 @@ export function useMicrophoneInput({
 
   useEffect(() => {
     if (!enabled) {
-      setStatus('off')
+      // A denial switches the microphone off by itself, so blanking the status
+      // here would leave the toggle sitting at Off with no reason given.
+      setStatus((prev) => (prev === 'denied' || prev === 'unsupported' ? prev : 'off'))
       setLevel(0)
       setDetectedMidi(null)
       return
