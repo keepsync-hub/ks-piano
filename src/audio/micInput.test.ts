@@ -155,6 +155,25 @@ describe('connectMicInput', () => {
     session.stop()
   })
 
+  it('passes the expected notes to the detector', async () => {
+    const { stream } = fakeStream()
+    stubGetUserMedia(stream)
+    setupAudioGraph(60)
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] })
+
+    const expectedNotes = vi.fn(() => [60, 64])
+    const session = await connectMicInput(
+      { onNoteOn: vi.fn(), onNoteOff: vi.fn(), expectedNotes },
+      vi.fn(),
+      { chordDetection: true },
+    )
+
+    vi.advanceTimersByTime(60)
+    expect(expectedNotes).toHaveBeenCalled()
+
+    session.stop()
+  })
+
   it('drops a note the app is playing itself, so its own output cannot answer for the user', async () => {
     const { stream } = fakeStream()
     stubGetUserMedia(stream)

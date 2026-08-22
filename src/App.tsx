@@ -57,10 +57,11 @@ function App() {
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
 
   // Microphone input: notes heard on a real piano, treated like MIDI notes.
-  // On by default: the browser asks for the microphone on load, and a denial
-  // (or an explicit Off) is remembered so it is never asked for twice.
+  // On by default, but only opened in practice mode — the one place a
+  // microphone does anything. So the browser asks on the first Practice, not on
+  // load, and the recording indicator goes out again when practice stops.
   const [micPreferred, setMicPreferred] = useLocalStorage('ks-piano-mic-on', true)
-  const [micEnabled, setMicEnabled] = useState(micPreferred)
+  const micEnabled = micPreferred && engine.mode === 'practice'
   const [micSettings, setMicSettings] = useLocalStorage<MicSettings>('ks-piano-mic', DEFAULT_MIC_SETTINGS)
 
   const { noteOn: engineNoteOn, noteOff: engineNoteOff } = engine
@@ -68,10 +69,7 @@ function App() {
     (midi: number, velocity: number) => engineNoteOn(midi, velocity, 'mic'),
     [engineNoteOn],
   )
-  const handleMicUnavailable = useCallback(() => {
-    setMicEnabled(false)
-    setMicPreferred(false)
-  }, [setMicPreferred])
+  const handleMicUnavailable = useCallback(() => setMicPreferred(false), [setMicPreferred])
 
   const mic = useMicrophoneInput({
     enabled: micEnabled,
@@ -84,13 +82,8 @@ function App() {
     onUnavailable: handleMicUnavailable,
   })
 
-  const handleMicEnabledChange = useCallback(
-    (enabled: boolean) => {
-      setMicEnabled(enabled)
-      setMicPreferred(enabled)
-    },
-    [setMicPreferred],
-  )
+  // Switched on but not practising yet: say so rather than reporting it off.
+  const micStatus = micPreferred && !micEnabled ? 'idle' : mic.status
 
   const demoSongs = useDemoSongs()
   const bestStarsFor = useCallback((songId: string) => getSongProgress(songId)?.bestStars ?? 0, [getSongProgress])
@@ -307,7 +300,7 @@ function App() {
             speed={engine.speed}
             mode={engine.mode}
             midiDevices={engine.midiDevices}
-            micStatus={mic.status}
+            micStatus={micStatus}
             micDetectedMidi={mic.detectedMidi}
             isWaitingForInput={engine.isWaitingForInput}
             loop={engine.loop}
@@ -357,9 +350,9 @@ function App() {
             inputOctaveShift={engine.inputOctaveShift}
             onInputOctaveShiftChange={engine.setInputOctaveShift}
             hasMidiDevice={engine.midiDevices.length > 0}
-            micEnabled={micEnabled}
-            onMicEnabledChange={handleMicEnabledChange}
-            micStatus={mic.status}
+            micEnabled={micPreferred}
+            onMicEnabledChange={setMicPreferred}
+            micStatus={micStatus}
             micLevel={mic.level}
             micDetectedMidi={mic.detectedMidi}
             micSettings={micSettings}

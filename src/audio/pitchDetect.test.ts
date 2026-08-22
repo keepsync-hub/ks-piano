@@ -95,7 +95,34 @@ describe('detectNotes', () => {
     expect(notes).toHaveLength(1)
   })
 
-  it('cannot resolve four dense voices — documents the known limit', () => {
+  it('extracts an octave, whose upper fundamental is the lower note\'s second partial', () => {
+    // Erasing a note's partials would take C4's fundamental out with C3's
+    // second partial, making C4 undetectable. Subtracting C3's smoothed
+    // envelope leaves the excess that is C4.
+    const notes = detectNotes(spectrumOf([48, 60]), BIN_HZ, { maxNotes: 3 })
+    expect(notes.map((n) => n.midi).sort((a, b) => a - b)).toEqual([48, 60])
+  })
+
+  it('finds all four voices of a dense chord when told which to look for', () => {
+    const voices = [48, 55, 64, 67]
+    const notes = detectNotes(spectrumOf(voices), BIN_HZ, { maxNotes: 3, expected: voices })
+    expect(notes.map((n) => n.midi).sort((a, b) => a - b)).toEqual(voices)
+  })
+
+  it('does not accept an expected note that is not sounding', () => {
+    const notes = detectNotes(spectrumOf([60]), BIN_HZ, { expected: [60, 71] })
+    expect(notes.map((n) => n.midi)).toEqual([60])
+  })
+
+  it('does not let an expected note ride on another note\'s harmonics', () => {
+    // C4's partials are exactly C5's harmonic series. Searching blind first
+    // claims them for C4, so nothing is left to sustain the expected C5 — the
+    // whole reason the guided pass runs second.
+    const notes = detectNotes(spectrumOf([60]), BIN_HZ, { expected: [72] })
+    expect(notes.map((n) => n.midi)).toEqual([60])
+  })
+
+  it('cannot resolve four dense voices blind — documents the known limit', () => {
     // An SATB hymn chord struck at once. The detector is not expected to return
     // all four voices; the accumulating release window in the tracker is what
     // makes such a chord practisable, by rolling it.

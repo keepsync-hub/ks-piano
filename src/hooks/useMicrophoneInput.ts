@@ -96,6 +96,9 @@ export function useMicrophoneInput({
    * two octaves away from the note being waited for is read as that note. It is
    * a deliberate leniency, and switchable off.
    */
+  /** The notes the practice gate is waiting for, so the detector can look for them. */
+  const expectedNotes = useCallback((): readonly number[] => [...requiredRef.current], [])
+
   const correct = useCallback((midi: number): number => {
     if (!octaveToleranceRef.current) return midi
     const required = requiredRef.current
@@ -127,6 +130,7 @@ export function useMicrophoneInput({
         onNoteOff: (midi) => handlersRef.current.onNoteOff(midi),
         shouldIgnore,
         correct,
+        expectedNotes,
       },
       (next, info) => {
         if (cancelled) return
@@ -151,7 +155,7 @@ export function useMicrophoneInput({
       active?.stop()
       echo.clear()
     }
-  }, [enabled, shouldIgnore, correct])
+  }, [enabled, shouldIgnore, correct, expectedNotes])
 
   useEffect(() => {
     sessionRef.current?.update({

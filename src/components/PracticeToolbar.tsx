@@ -47,6 +47,7 @@ interface PracticeToolbarProps {
 
 const MIC_STATUS_TEXT: Record<MicStatus, string> = {
   off: 'Off',
+  idle: 'Starts in Practice mode',
   requesting: 'Asking permission…',
   waiting: 'Click the page to start',
   listening: 'Listening',
@@ -273,6 +274,10 @@ export function PracticeToolbar({
               <button type="button" className="tool-btn" onClick={onMicCalibrate} title="Measure the room noise — stay quiet for a moment">
                 Calibrate
               </button>
+            </>
+          )}
+          {micEnabled && (
+            <>
               <label className="tool-slider">
                 Sensitivity
                 <input
@@ -301,7 +306,10 @@ export function PracticeToolbar({
                 />
                 Allow octave slips
               </label>
-              <span className="tool-hint">Use headphones — the app's own sound confuses the detector.</span>
+              <span className="tool-hint">
+                Use headphones — the app's own sound confuses the detector. In practice mode the detector also
+                looks for the notes you are being asked to play, which is what makes chords work.
+              </span>
             </>
           )}
         </div>
