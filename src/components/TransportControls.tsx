@@ -40,6 +40,7 @@ function inputStatusText(midiDevices: string[], micStatus: MicStatus, micDetecte
     return `Mic: listening — ${heard}`
   }
   if (micStatus === 'requesting') return 'Mic: asking for permission…'
+  if (micStatus === 'waiting') return 'Mic: click anywhere to start listening'
   if (micStatus === 'denied') return 'Mic: permission denied — use the on-screen keys or A–; keys'
   if (midiDevices.length > 0) return `MIDI: ${midiDevices.join(', ')}`
   return 'No MIDI device — use the on-screen keys, A–; keys, or the microphone'

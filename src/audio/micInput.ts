@@ -1,6 +1,5 @@
 import * as Tone from 'tone'
 import { createNoteTracker, detectNotes } from './pitchDetect'
-import { ensureAudioStarted } from './synth'
 
 /**
  * Microphone input: listens to the device's microphone and reports the notes
@@ -8,7 +7,14 @@ import { ensureAudioStarted } from './synth'
  * way a MIDI cable would. Deliberately shaped like `connectMidiInputs`.
  */
 
-export type MicStatus = 'off' | 'requesting' | 'listening' | 'denied' | 'unsupported'
+export type MicStatus =
+  | 'off'
+  | 'requesting'
+  /** Permission granted, but the browser will not process audio until the page is clicked. */
+  | 'waiting'
+  | 'listening'
+  | 'denied'
+  | 'unsupported'
 
 export interface MicInfo {
   /** Input level, 0-1, for a meter. */
@@ -68,6 +74,36 @@ function gateFor(sensitivity: number) {
   }
 }
 
+/**
+ * Browsers keep an AudioContext suspended until the page itself has been
+ * interacted with, and granting the microphone permission does not count — so
+ * a microphone opened on page load would capture nothing until the first
+ * click. Resumes now if allowed, and otherwise on the first interaction.
+ * Returns a function that detaches the listeners.
+ */
+function resumeWhenAllowed(context: AudioContext): () => void {
+  const events = ['pointerdown', 'keydown', 'touchstart'] as const
+
+  function attempt(): void {
+    void context.resume?.().catch(() => {})
+  }
+
+  attempt()
+  if (context.state === 'running') return () => {}
+
+  function onGesture(): void {
+    attempt()
+    detach()
+  }
+
+  function detach(): void {
+    for (const event of events) document.removeEventListener(event, onGesture, true)
+  }
+
+  for (const event of events) document.addEventListener(event, onGesture, true)
+  return detach
+}
+
 export async function connectMicInput(
   handlers: MicInputHandlers,
   onStatus: (status: MicStatus, info?: MicInfo) => void,
@@ -97,8 +133,11 @@ export async function connectMicInput(
     return NOOP_SESSION
   }
 
-  await ensureAudioStarted()
+  // Deliberately not ensureAudioStarted(): capture needs the context running,
+  // not Tone's synth started, and leaving that flag alone keeps the normal
+  // gesture-driven Tone.start() intact for playback.
   const context = Tone.getContext().rawContext as unknown as AudioContext
+  const stopResuming = resumeWhenAllowed(context)
 
   const source = context.createMediaStreamSource(stream)
   const highpass = context.createBiquadFilter()
@@ -131,6 +170,14 @@ export async function connectMicInput(
   }
 
   function poll(): void {
+    // Self-correcting: as soon as anything resumes the context — our own
+    // listener, or the first note played — this reports 'listening' again.
+    if (context.state !== 'running') {
+      emit(tracker.reset(performance.now()))
+      onStatus('waiting')
+      return
+    }
+
     const now = performance.now()
     analyser.getFloatTimeDomainData(samples)
 
@@ -180,11 +227,12 @@ export async function connectMicInput(
   }
 
   const timer = window.setInterval(poll, POLL_MS)
-  onStatus('listening', { level: 0, midi: null })
+  onStatus(context.state === 'running' ? 'listening' : 'waiting', { level: 0, midi: null })
 
   return {
     stop: () => {
       window.clearInterval(timer)
+      stopResuming()
       emit(tracker.reset(performance.now()))
       analyser.disconnect()
       highpass.disconnect()

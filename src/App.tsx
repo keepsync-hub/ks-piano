@@ -57,8 +57,10 @@ function App() {
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
 
   // Microphone input: notes heard on a real piano, treated like MIDI notes.
-  const [micEnabled, setMicEnabled] = useState(false)
-  const [micPreferred, setMicPreferred] = useLocalStorage('ks-piano-mic-on', false)
+  // On by default: the browser asks for the microphone on load, and a denial
+  // (or an explicit Off) is remembered so it is never asked for twice.
+  const [micPreferred, setMicPreferred] = useLocalStorage('ks-piano-mic-on', true)
+  const [micEnabled, setMicEnabled] = useState(micPreferred)
   const [micSettings, setMicSettings] = useLocalStorage<MicSettings>('ks-piano-mic', DEFAULT_MIC_SETTINGS)
 
   const { noteOn: engineNoteOn, noteOff: engineNoteOff } = engine
@@ -89,19 +91,6 @@ function App() {
     },
     [setMicPreferred],
   )
-
-  // Re-opening the microphone without a click is only allowed once permission
-  // has already been granted; otherwise it waits for the toggle.
-  useEffect(() => {
-    if (!micPreferred) return
-    navigator.permissions
-      ?.query({ name: 'microphone' as PermissionName })
-      .then((result) => {
-        if (result.state === 'granted') setMicEnabled(true)
-      })
-      .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const demoSongs = useDemoSongs()
   const bestStarsFor = useCallback((songId: string) => getSongProgress(songId)?.bestStars ?? 0, [getSongProgress])

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import type { MicInputHandlers, MicSession } from '../audio/micInput'
+import type { MicInputHandlers, MicSession, MicStatus } from '../audio/micInput'
 
 const { connectMicInput, captured, session } = vi.hoisted(() => {
   const captured: { handlers?: MicInputHandlers } = {}
@@ -8,7 +8,7 @@ const { connectMicInput, captured, session } = vi.hoisted(() => {
   return {
     captured,
     session,
-    connectMicInput: vi.fn(async (handlers: MicInputHandlers) => {
+    connectMicInput: vi.fn(async (handlers: MicInputHandlers, _onStatus: (status: MicStatus) => void) => {
       captured.handlers = handlers
       return session
     }),
@@ -72,6 +72,21 @@ describe('useMicrophoneInput', () => {
 
     rerender({ ...props, advanceKey: 2 })
     expect(session.reset).toHaveBeenCalled()
+  })
+
+  it('keeps saying why after a denial switches the microphone off', async () => {
+    connectMicInput.mockImplementationOnce(async (handlers: MicInputHandlers, onStatus) => {
+      captured.handlers = handlers
+      onStatus('denied')
+      return session
+    })
+
+    const { result, rerender, props } = setup()
+    await waitFor(() => expect(result.current.status).toBe('denied'))
+
+    // This is what App does when the hook reports the microphone unusable.
+    rerender({ ...props, enabled: false })
+    expect(result.current.status).toBe('denied')
   })
 
   it('does not open the microphone while disabled', async () => {

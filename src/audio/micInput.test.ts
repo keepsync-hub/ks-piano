@@ -2,11 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { midiToFrequency } from './pitchDetect'
 
 const { fakeContext } = vi.hoisted(() => ({
-  fakeContext: { sampleRate: 48000 } as unknown as AudioContext,
+  fakeContext: { sampleRate: 48000, state: 'running', resume: () => Promise.resolve() } as unknown as AudioContext,
 }))
 
 vi.mock('tone', () => ({ getContext: () => ({ rawContext: fakeContext }) }))
-vi.mock('./synth', () => ({ ensureAudioStarted: vi.fn().mockResolvedValue(undefined) }))
 
 const { connectMicInput } = await import('./micInput')
 
@@ -21,7 +20,7 @@ function decibelsFor(midi: number, bins: number, binHz: number): Float32Array {
   return magnitudes.map((m) => 20 * Math.log10(Math.max(m, 1e-9)))
 }
 
-function setupAudioGraph(midi: number | null) {
+function setupAudioGraph(midi: number | null, state: AudioContextState = 'running') {
   const node = { connect: vi.fn(), disconnect: vi.fn() }
   const analyser = {
     fftSize: 2048,
@@ -39,6 +38,8 @@ function setupAudioGraph(midi: number | null) {
   }
 
   Object.assign(fakeContext, {
+    state,
+    resume: vi.fn(() => Promise.resolve()),
     createMediaStreamSource: vi.fn(() => node),
     createBiquadFilter: vi.fn(() => ({ ...node, type: '', frequency: { value: 0 } })),
     createAnalyser: vi.fn(() => analyser),
@@ -65,6 +66,54 @@ function stubGetUserMedia(value: MediaStream | Error | null) {
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+/** The AnalyserNode reads nothing while the context is suspended. */
+describe('connectMicInput with a suspended audio context', () => {
+  it('says it is waiting for a click rather than pretending to listen', async () => {
+    const { stream } = fakeStream()
+    stubGetUserMedia(stream)
+    setupAudioGraph(60, 'suspended')
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] })
+
+    const onNoteOn = vi.fn()
+    const onStatus = vi.fn()
+    const session = await connectMicInput({ onNoteOn, onNoteOff: vi.fn() }, onStatus)
+
+    vi.advanceTimersByTime(120)
+
+    expect(onStatus).toHaveBeenLastCalledWith('waiting')
+    expect(onNoteOn).not.toHaveBeenCalled()
+
+    session.stop()
+  })
+
+  it('resumes the context on the first interaction with the page', async () => {
+    const { stream } = fakeStream()
+    stubGetUserMedia(stream)
+    setupAudioGraph(60, 'suspended')
+
+    const session = await connectMicInput({ onNoteOn: vi.fn(), onNoteOff: vi.fn() }, vi.fn())
+    // Once on connecting, and again when the page is finally clicked.
+    expect(fakeContext.resume).toHaveBeenCalledTimes(1)
+
+    document.dispatchEvent(new Event('pointerdown'))
+    expect(fakeContext.resume).toHaveBeenCalledTimes(2)
+
+    session.stop()
+  })
+
+  it('stops listening for interactions once the microphone is closed', async () => {
+    const { stream } = fakeStream()
+    stubGetUserMedia(stream)
+    setupAudioGraph(60, 'suspended')
+
+    const session = await connectMicInput({ onNoteOn: vi.fn(), onNoteOff: vi.fn() }, vi.fn())
+    session.stop()
+
+    document.dispatchEvent(new Event('pointerdown'))
+    expect(fakeContext.resume).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('connectMicInput', () => {

@@ -48,6 +48,7 @@ interface PracticeToolbarProps {
 const MIC_STATUS_TEXT: Record<MicStatus, string> = {
   off: 'Off',
   requesting: 'Asking permission…',
+  waiting: 'Click the page to start',
   listening: 'Listening',
   denied: 'Permission denied',
   unsupported: 'Not supported here',
