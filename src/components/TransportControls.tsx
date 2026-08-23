@@ -14,6 +14,8 @@ interface TransportControlsProps {
   speed: number
   mode: PlaybackMode
   midiDevices: string[]
+  /** Name of the instrument sounding the playback, when it isn't this device. */
+  outputDeviceName?: string | null
   micStatus: MicStatus
   micDetectedMidi: number | null
   isWaitingForInput: boolean
@@ -55,6 +57,7 @@ export function TransportControls({
   speed,
   mode,
   midiDevices,
+  outputDeviceName,
   micStatus,
   micDetectedMidi,
   isWaitingForInput,
@@ -68,6 +71,9 @@ export function TransportControls({
   onModeChange,
 }: TransportControlsProps) {
   const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement)
+  const statusText = outputDeviceName
+    ? `${inputStatusText(midiDevices, micStatus, micDetectedMidi)} · Sound out: ${outputDeviceName}`
+    : inputStatusText(midiDevices, micStatus, micDetectedMidi)
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement)
@@ -178,7 +184,7 @@ export function TransportControls({
             ))}
           </span>
         )}
-        <span className="status-pill status-pill-muted">{inputStatusText(midiDevices, micStatus, micDetectedMidi)}</span>
+        <span className="status-pill status-pill-muted">{statusText}</span>
       </div>
     </div>
   )
