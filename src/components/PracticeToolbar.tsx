@@ -1,4 +1,5 @@
-import type { HandFilter, LoopRegion, MixerState } from '../hooks/usePlaybackEngine'
+import type { HandFilter, LoopRegion, MixerState, OutputRoute } from '../hooks/usePlaybackEngine'
+import type { MidiOutputDevice } from '../audio/midiOutput'
 import type { MicSettings } from '../hooks/useMicrophoneInput'
 import type { MicStatus } from '../audio/micInput'
 import { midiToLabel, midiToOctave } from '../piano/noteNames'
@@ -35,6 +36,11 @@ interface PracticeToolbarProps {
   inputOctaveShift: number
   onInputOctaveShiftChange: (shift: number) => void
   hasMidiDevice: boolean
+  outputRoute: OutputRoute
+  onOutputRouteChange: (route: OutputRoute) => void
+  midiOutputs: MidiOutputDevice[]
+  midiOutputId: string | null
+  onMidiOutputChange: (id: string | null) => void
   micEnabled: boolean
   onMicEnabledChange: (enabled: boolean) => void
   micStatus: MicStatus
@@ -43,6 +49,12 @@ interface PracticeToolbarProps {
   micSettings: MicSettings
   onMicSettingsChange: (settings: MicSettings) => void
   onMicCalibrate: () => void
+}
+
+const OUTPUT_ROUTE_LABEL: Record<OutputRoute, string> = {
+  internal: 'This device',
+  midi: 'MIDI piano',
+  both: 'Both',
 }
 
 const MIC_STATUS_TEXT: Record<MicStatus, string> = {
@@ -91,6 +103,11 @@ export function PracticeToolbar({
   inputOctaveShift,
   onInputOctaveShiftChange,
   hasMidiDevice,
+  outputRoute,
+  onOutputRouteChange,
+  midiOutputs,
+  midiOutputId,
+  onMidiOutputChange,
   micEnabled,
   onMicEnabledChange,
   micStatus,
@@ -100,6 +117,14 @@ export function PracticeToolbar({
   onMicSettingsChange,
   onMicCalibrate,
 }: PracticeToolbarProps) {
+  // Web MIDI output only exists in Chromium-based browsers; elsewhere the
+  // controls stay visible but inert, with a line saying why.
+  const webMidiSupported = typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess
+  const midiOutputSupported = midiOutputs.length > 0
+  const outputHint = webMidiSupported
+    ? 'Connect a piano over USB-MIDI to hear it play the song'
+    : 'MIDI output needs Chrome, Edge or Opera'
+
   return (
     <>
       {open && <div className="toolbar-backdrop" onClick={onClose} />}
@@ -249,6 +274,50 @@ export function PracticeToolbar({
             {showFingering ? 'On' : 'Off'}
           </button>
           {showFingering && <span className="tool-hint">Press 1–5 while practising to correct</span>}
+        </div>
+
+        <div className="tool-group tool-group-output" role="group" aria-label="Sound output">
+          <span className="tool-label">Sound out</span>
+          {(['internal', 'midi', 'both'] as const).map((route) => (
+            <button
+              key={route}
+              type="button"
+              className={outputRoute === route ? 'tool-btn tool-btn-active' : 'tool-btn'}
+              onClick={() => onOutputRouteChange(route)}
+              disabled={route !== 'internal' && !midiOutputSupported}
+              aria-pressed={outputRoute === route}
+              title={
+                route === 'internal'
+                  ? 'Play the song through this computer'
+                  : route === 'midi'
+                    ? 'Let the connected instrument make the sound itself'
+                    : 'Play through both at once'
+              }
+            >
+              {OUTPUT_ROUTE_LABEL[route]}
+            </button>
+          ))}
+          {!midiOutputSupported && <span className="tool-hint">{outputHint}</span>}
+          {midiOutputSupported && midiOutputs.length > 1 && (
+            <label className="tool-select">
+              Port
+              <select
+                value={midiOutputId ?? ''}
+                onChange={(e) => onMidiOutputChange(e.target.value || null)}
+                aria-label="MIDI output port"
+              >
+                <option value="">{`Automatic (${midiOutputs[0].name})`}</option>
+                {midiOutputs.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {midiOutputSupported && outputRoute !== 'internal' && (
+            <span className="tool-hint">The metronome still clicks through this device</span>
+          )}
         </div>
 
         <div className="tool-group tool-group-mic" role="group" aria-label="Microphone input">

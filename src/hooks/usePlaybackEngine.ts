@@ -3,6 +3,7 @@ import type { Hand, NoteEvent, PlaybackMode, Song } from '../types'
 import { ensureAudioStarted, playNote, releaseNote } from '../audio/synth'
 import { playClick } from '../audio/metronome'
 import { connectMidiInputs } from '../audio/midiInput'
+import { connectMidiOutputs, type MidiOutputController, type MidiOutputDevice } from '../audio/midiOutput'
 import { withSuggestedFingering } from '../piano/fingering'
 
 interface NoteGroup {
@@ -16,6 +17,12 @@ export type HandFilter = 'both' | Hand
  * room, so the app must not sound them a second time.
  */
 export type NoteSource = 'device' | 'mic'
+/**
+ * Where the app's own playback is sounded. Never applies to the user's live
+ * input, which always stays on the internal synth: echoing it back out would
+ * double every note and feed back when one instrument is both ports.
+ */
+export type OutputRoute = 'internal' | 'midi' | 'both'
 export interface LoopRegion {
   start: number
   end: number
@@ -79,7 +86,12 @@ interface PlaybackEngineCallbacks {
   onNotePlayed?: (midi: number, correct: boolean) => void
 }
 
-export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
+export interface PlaybackEngineOptions {
+  outputRoute?: OutputRoute
+  midiOutputId?: string | null
+}
+
+export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks, options?: PlaybackEngineOptions) {
   const callbacksRef = useRef(callbacks)
   useEffect(() => {
     callbacksRef.current = callbacks
@@ -96,6 +108,7 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
   const [soundingFingers, setSoundingFingers] = useState<Map<number, number>>(new Map())
   const [clearedGroupIndex, setClearedGroupIndex] = useState(-1)
   const [midiDevices, setMidiDevices] = useState<string[]>([])
+  const [midiOutputs, setMidiOutputs] = useState<MidiOutputDevice[]>([])
   const [notesPlayed, setNotesPlayed] = useState(0)
   const [totalNotes, setTotalNotes] = useState(0)
   const [errors, setErrors] = useState(0)
@@ -132,6 +145,9 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
   const countInTimersRef = useRef<number[]>([])
   const soundingMapRef = useRef<Map<number, { endTime: number; hand: Hand; finger?: number }>>(new Map())
   const clockRef = useRef<{ baseTime: number; startedAt: number | null }>({ baseTime: 0, startedAt: null })
+  const midiOutRef = useRef<MidiOutputController | null>(null)
+  const routeRef = useRef<OutputRoute>('internal')
+  const midiOutputIdRef = useRef<string | null>(options?.midiOutputId ?? null)
 
   const isActiveHand = useCallback(
     (hand: Hand) => handFilterRef.current === 'both' || handFilterRef.current === hand,
@@ -155,6 +171,8 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
     clockRef.current = { baseTime: t, startedAt: null }
     playingRef.current = false
     setPlaying(false)
+    // Unlike a seek, pausing keeps the sounding map, so flush the hardware here.
+    midiOutRef.current?.allNotesOff()
   }, [])
 
   const resumeFrom = useCallback((t: number) => {
@@ -185,6 +203,10 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
     setClearedGroupIndex(idx)
 
     lastBeatRef.current = Number.NEGATIVE_INFINITY
+    // Every jump of the playhead drops the sounding map on the floor, so the
+    // hardware needs telling too — MIDI has no envelope, and a note-on without
+    // its note-off sounds forever.
+    midiOutRef.current?.allNotesOff()
     soundingMapRef.current.clear()
     setSoundingNotes(new Set())
     setSoundingHands(new Map())
@@ -457,6 +479,46 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
     return () => cleanup?.()
   }, [externalNoteOn, externalNoteOff])
 
+  // Hardware MIDI output, so a connected instrument can sound the playback itself.
+  useEffect(() => {
+    let controller: MidiOutputController | null = null
+    let disposed = false
+    connectMidiOutputs(setMidiOutputs).then((c) => {
+      if (disposed) {
+        c.close()
+        return
+      }
+      controller = c
+      midiOutRef.current = c
+      // Ports only appear once this resolves, so the ref holds whatever the
+      // stored preference was by then.
+      c.select(midiOutputIdRef.current)
+    })
+    const flush = () => controller?.allNotesOff()
+    // A reload mid-song would otherwise leave the instrument sounding.
+    window.addEventListener('pagehide', flush)
+    return () => {
+      disposed = true
+      window.removeEventListener('pagehide', flush)
+      midiOutRef.current = null
+      controller?.close()
+    }
+  }, [])
+
+  const outputRoute = options?.outputRoute ?? 'internal'
+  const midiOutputId = options?.midiOutputId ?? null
+
+  useEffect(() => {
+    // Leaving a route mid-note would strand whatever the instrument is holding.
+    midiOutRef.current?.allNotesOff()
+    routeRef.current = outputRoute
+  }, [outputRoute])
+
+  useEffect(() => {
+    midiOutputIdRef.current = midiOutputId
+    midiOutRef.current?.select(midiOutputId)
+  }, [midiOutputId])
+
   useEffect(() => cancelCountIn, [cancelCountIn])
 
   // Main animation loop.
@@ -521,7 +583,14 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
             // The mixer only attenuates the app's own auto-play, never the
             // user's live input (noteOn/externalNoteOn) — see getHandGain.
             const gain = getHandGain(mixerRef.current, n.hand)
-            if (gain > 0) playNote(n.midi, n.velocity * gain, n.duration)
+            if (gain > 0) {
+              // Hand volume rides on the velocity rather than CC7: it is
+              // per-note, matches what the internal synth does, and leaves no
+              // controller state stuck on the instrument afterwards.
+              const velocity = n.velocity * gain
+              if (routeRef.current !== 'midi') playNote(n.midi, velocity, n.duration)
+              if (routeRef.current !== 'internal') midiOutRef.current?.noteOn(n.midi, velocity)
+            }
             soundingMapRef.current.set(n.midi, { endTime: n.time + n.duration, hand: n.hand, finger: n.finger })
             dirty = true
           }
@@ -531,6 +600,7 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
         for (const [midi, info] of soundingMapRef.current) {
           if (info.endTime <= t) {
             soundingMapRef.current.delete(midi)
+            midiOutRef.current?.noteOff(midi)
             dirty = true
           }
         }
@@ -634,6 +704,7 @@ export function usePlaybackEngine(callbacks?: PlaybackEngineCallbacks) {
     externalNoteOn,
     externalNoteOff,
     midiDevices,
+    midiOutputs,
     nextRequiredNotes,
     nextRequiredTime,
     isWaitingForInput,

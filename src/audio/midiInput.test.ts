@@ -1,7 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { connectMidiInputs } from './midiInput'
+import { resetMidiAccessForTests } from './midiAccess'
 
 describe('connectMidiInputs', () => {
+  beforeEach(() => {
+    // The access promise is cached in a module variable, so each case needs a clean slate.
+    resetMidiAccessForTests()
+    Object.defineProperty(globalThis.navigator, 'requestMIDIAccess', {
+      value: undefined,
+      configurable: true,
+    })
+  })
+
   it('returns empty device list when Web MIDI is unavailable', async () => {
     const onDevicesChanged = vi.fn()
     const cleanup = await connectMidiInputs({ onNoteOn: vi.fn(), onNoteOff: vi.fn() }, onDevicesChanged)
@@ -23,7 +33,8 @@ describe('connectMidiInputs', () => {
 
     const access = {
       inputs: new Map([['input-1', input as unknown as MIDIInput]]),
-      onstatechange: null as ((event: Event) => void) | null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     }
 
     Object.defineProperty(globalThis.navigator, 'requestMIDIAccess', {

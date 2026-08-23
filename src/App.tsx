@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { usePlaybackEngine } from './hooks/usePlaybackEngine'
+import { usePlaybackEngine, type OutputRoute } from './hooks/usePlaybackEngine'
 import { useComputerKeyboard } from './hooks/useComputerKeyboard'
 import { DEFAULT_MIC_SETTINGS, useMicrophoneInput, type MicSettings } from './hooks/useMicrophoneInput'
 import { useShortcuts } from './hooks/useShortcuts'
@@ -36,6 +36,11 @@ function App() {
   const workoutCompleteRef = useRef<(() => void) | null>(null)
   const workoutNoteRef = useRef<((correct: boolean) => void) | null>(null)
 
+  // Where song playback is sounded. Defaults to this device, so nothing changes
+  // for anyone without a MIDI instrument plugged in.
+  const [outputRoute, setOutputRoute] = useLocalStorage<OutputRoute>('ks-piano-output-route', 'internal')
+  const [midiOutputId, setMidiOutputId] = useLocalStorage<string | null>('ks-piano-midi-out', null)
+
   const engine = usePlaybackEngine({
     onError: (midi) => {
       setErrorFlash(midi)
@@ -53,7 +58,7 @@ function App() {
       }
       workoutNoteRef.current?.(correct)
     },
-  })
+  }, { outputRoute, midiOutputId })
   useComputerKeyboard(engine.externalNoteOn, engine.externalNoteOff)
 
   // Microphone input: notes heard on a real piano, treated like MIDI notes.
@@ -300,6 +305,13 @@ function App() {
             speed={engine.speed}
             mode={engine.mode}
             midiDevices={engine.midiDevices}
+            outputDeviceName={
+              outputRoute === 'internal'
+                ? null
+                : ((midiOutputId
+                    ? engine.midiOutputs.find((d) => d.id === midiOutputId)?.name
+                    : engine.midiOutputs[0]?.name) ?? null)
+            }
             micStatus={micStatus}
             micDetectedMidi={mic.detectedMidi}
             isWaitingForInput={engine.isWaitingForInput}
@@ -350,6 +362,11 @@ function App() {
             inputOctaveShift={engine.inputOctaveShift}
             onInputOctaveShiftChange={engine.setInputOctaveShift}
             hasMidiDevice={engine.midiDevices.length > 0}
+            outputRoute={outputRoute}
+            onOutputRouteChange={setOutputRoute}
+            midiOutputs={engine.midiOutputs}
+            midiOutputId={midiOutputId}
+            onMidiOutputChange={setMidiOutputId}
             micEnabled={micPreferred}
             onMicEnabledChange={setMicPreferred}
             micStatus={micStatus}

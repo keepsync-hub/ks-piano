@@ -1,3 +1,5 @@
+import { getMidiAccess } from './midiAccess'
+
 export interface MidiInputHandlers {
   onNoteOn: (midi: number, velocity: number) => void
   onNoteOff: (midi: number) => void
@@ -11,18 +13,12 @@ export async function connectMidiInputs(
   handlers: MidiInputHandlers,
   onDevicesChanged: (names: string[]) => void,
 ): Promise<() => void> {
-  if (!navigator.requestMIDIAccess) {
+  const maybeAccess = await getMidiAccess()
+  if (!maybeAccess) {
     onDevicesChanged([])
     return () => {}
   }
-
-  let access: MIDIAccess
-  try {
-    access = await navigator.requestMIDIAccess()
-  } catch {
-    onDevicesChanged([])
-    return () => {}
-  }
+  const access: MIDIAccess = maybeAccess
 
   const attached: MIDIInput[] = []
 
@@ -50,11 +46,17 @@ export async function connectMidiInputs(
     onDevicesChanged(names)
   }
 
+  function handleStateChange() {
+    attachAll()
+  }
+
   attachAll()
-  access.onstatechange = () => attachAll()
+  // addEventListener, not onstatechange: the MIDIAccess is shared with the
+  // output side, and the property is a single slot they would fight over.
+  access.addEventListener('statechange', handleStateChange)
 
   return () => {
-    access.onstatechange = null
+    access.removeEventListener('statechange', handleStateChange)
     for (const input of attached) input.removeEventListener('midimessage', handleMessage as EventListener)
   }
 }

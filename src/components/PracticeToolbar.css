@@ -208,3 +208,22 @@
 .tool-slider input {
   flex: 1;
 }
+
+.tool-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9aa0b0;
+  flex: 1 1 100%;
+}
+
+.tool-select select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+}
